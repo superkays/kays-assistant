@@ -5,6 +5,7 @@ from openai import OpenAI
 
 from ai_order import parse_order
 from process_order import process_order
+from database import create_database
 
 # ==========================================
 # CONFIGURATION
@@ -28,6 +29,8 @@ if not api_key:
     st.stop()
 
 client = OpenAI(api_key=api_key)
+
+create_database()
 
 # ==========================================
 # KNOWLEDGE BASE
