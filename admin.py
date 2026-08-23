@@ -128,53 +128,55 @@ if not st.session_state.admin_authenticated:
 
     .login-card {
 
-        padding: 35px;
+    max-width: 420px;
 
-        background:
-            rgba(255, 255, 255, 0.07);
+    margin: 20px auto 30px auto;
 
-        border:
-            1px solid
-            rgba(255, 255, 255, 0.10);
+    padding: 35px 25px;
 
-        border-radius: 24px;
+    background:
+        rgba(255, 255, 255, 0.08);
 
-        text-align: center;
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
 
-    }
+    border-radius: 24px;
+
+    text-align: center;
+
+}
 
 
     .login-logo {
 
-        font-size: 55px;
+    font-size: 55px;
 
-        margin-bottom: 10px;
+    margin-bottom: 10px;
 
-    }
+}
 
 
     .login-title {
 
-        color: white;
+    font-size: 30px;
 
-        font-size: 30px;
+    font-weight: 800;
 
-        font-weight: 800;
+    color: white;
 
-    }
+}
 
 
     .login-subtitle {
 
-        color: #94a3b8;
+    font-size: 14px;
 
-        font-size: 14px;
+    color: #94a3b8;
 
-        margin-top: 7px;
+    margin-top: 6px;
 
-        margin-bottom: 25px;
-
-    }
+}
 
     </style>
     """)
@@ -188,7 +190,7 @@ if not st.session_state.admin_authenticated:
         </div>
 
         <div class="login-title">
-            Kays Kitchen
+            Kays Indonesia
         </div>
 
         <div class="login-subtitle">
@@ -478,6 +480,38 @@ footer {
 
 @media (max-width: 700px) {
 
+    .login-card {
+
+        max-width: 100%;
+
+        margin: 10px auto 25px auto;
+
+        padding: 25px 18px;
+
+        border-radius: 20px;
+
+    }
+
+    .login-logo {
+
+        font-size: 42px;
+
+    }
+
+    .login-title {
+
+        font-size: 26px;
+
+    }
+
+    .login-subtitle {
+
+        font-size: 13px;
+
+    }
+
+}
+
     .block-container {
 
         padding-left: 14px;
@@ -510,6 +544,8 @@ footer {
     }
 
 }
+
+
 
 </style>
 """)
@@ -546,11 +582,15 @@ logout_col1, logout_col2 = st.columns(
 with logout_col2:
 
     if st.button(
-        "🚪 Logout",
-        use_container_width=True
+            "🚪 Logout",
+            use_container_width=True
     ):
-
         st.session_state.admin_authenticated = False
+
+        st.session_state.pop(
+            "admin_password_input",
+            None
+        )
 
         st.rerun()
 
