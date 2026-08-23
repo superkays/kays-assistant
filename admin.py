@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from html import escape
 
 from database import (
     create_database,
@@ -29,60 +30,224 @@ create_database()
 
 
 # =========================================================
-# TIMEZONE
+# ADMIN PASSWORD
 # =========================================================
 
-def format_datetime_gmt7(created_at):
+def get_admin_password():
 
-    if not created_at:
-
-        return "-"
+    # -----------------------------------------------------
+    # PRIORITAS 1: STREAMLIT SECRETS
+    # -----------------------------------------------------
 
     try:
 
-        # -------------------------------------------------
-        # Ubah menjadi datetime
-        # -------------------------------------------------
+        password = st.secrets["ADMIN_PASSWORD"]
 
-        dt = datetime.fromisoformat(
-            str(created_at).replace(
-                "Z",
-                "+00:00"
-            )
-        )
+        if password:
 
-        # -------------------------------------------------
-        # Jika tidak memiliki timezone,
-        # anggap data berasal dari UTC
-        # -------------------------------------------------
-
-        if dt.tzinfo is None:
-
-            dt = dt.replace(
-                tzinfo=ZoneInfo("UTC")
-            )
-
-        # -------------------------------------------------
-        # Konversi UTC → Asia/Jakarta
-        # GMT+7
-        # -------------------------------------------------
-
-        dt_gmt7 = dt.astimezone(
-            ZoneInfo("Asia/Jakarta")
-        )
-
-        # -------------------------------------------------
-        # Format tampilan
-        # DD/MM/YYYY HH:MM
-        # -------------------------------------------------
-
-        return dt_gmt7.strftime(
-            "%d/%m/%Y %H:%M"
-        )
+            return password
 
     except Exception:
 
-        return str(created_at)
+        pass
+
+
+    # -----------------------------------------------------
+    # PRIORITAS 2: ENVIRONMENT VARIABLE
+    # -----------------------------------------------------
+
+    import os
+
+    password = os.getenv(
+        "ADMIN_PASSWORD"
+    )
+
+    if password:
+
+        return password
+
+
+    return None
+
+
+ADMIN_PASSWORD = get_admin_password()
+
+
+# =========================================================
+# LOGIN STATE
+# =========================================================
+
+if "admin_authenticated" not in st.session_state:
+
+    st.session_state.admin_authenticated = False
+
+
+# =========================================================
+# LOGIN PAGE
+# =========================================================
+
+if not st.session_state.admin_authenticated:
+
+    st.html("""
+    <style>
+
+    .stApp {
+
+        background:
+            linear-gradient(
+                180deg,
+                #111827 0%,
+                #172554 50%,
+                #111827 100%
+            );
+
+    }
+
+
+    #MainMenu {
+        visibility: hidden;
+    }
+
+    header {
+        visibility: hidden;
+    }
+
+    footer {
+        visibility: hidden;
+    }
+
+
+    .block-container {
+
+        max-width: 500px;
+
+        padding-top: 8rem;
+
+    }
+
+
+    .login-card {
+
+        padding: 35px;
+
+        background:
+            rgba(255, 255, 255, 0.07);
+
+        border:
+            1px solid
+            rgba(255, 255, 255, 0.10);
+
+        border-radius: 24px;
+
+        text-align: center;
+
+    }
+
+
+    .login-logo {
+
+        font-size: 55px;
+
+        margin-bottom: 10px;
+
+    }
+
+
+    .login-title {
+
+        color: white;
+
+        font-size: 30px;
+
+        font-weight: 800;
+
+    }
+
+
+    .login-subtitle {
+
+        color: #94a3b8;
+
+        font-size: 14px;
+
+        margin-top: 7px;
+
+        margin-bottom: 25px;
+
+    }
+
+    </style>
+    """)
+
+
+    st.html("""
+    <div class="login-card">
+
+        <div class="login-logo">
+            🍗
+        </div>
+
+        <div class="login-title">
+            Kays Kitchen
+        </div>
+
+        <div class="login-subtitle">
+            Admin Dashboard
+        </div>
+
+    </div>
+    """)
+
+
+    password_input = st.text_input(
+
+        "🔐 Password Admin",
+
+        type="password",
+
+        placeholder="Masukkan password admin",
+
+        key="admin_password_input"
+
+    )
+
+
+    login_clicked = st.button(
+
+        "🔓 Login Admin",
+
+        use_container_width=True,
+
+        type="primary"
+
+    )
+
+
+    if login_clicked:
+
+        if not ADMIN_PASSWORD:
+
+            st.error(
+                "ADMIN_PASSWORD belum dikonfigurasi "
+                "di Streamlit Secrets."
+            )
+
+        elif password_input == ADMIN_PASSWORD:
+
+            st.session_state.admin_authenticated = True
+
+            st.session_state.admin_password_input = ""
+
+            st.rerun()
+
+        else:
+
+            st.error(
+                "❌ Password Admin salah."
+            )
+
+
+    st.stop()
 
 
 # =========================================================
@@ -296,6 +461,19 @@ footer {
 
 
 /* =====================================================
+   LOGOUT BUTTON
+   ===================================================== */
+
+.logout-area {
+
+    margin-top: 10px;
+
+    margin-bottom: 20px;
+
+}
+
+
+/* =====================================================
    MOBILE
    ===================================================== */
 
@@ -305,6 +483,8 @@ footer {
 
         padding-left: 14px;
         padding-right: 14px;
+
+        padding-top: 1.5rem;
 
     }
 
@@ -320,6 +500,13 @@ footer {
 
         grid-template-columns:
             1fr;
+
+    }
+
+
+    .complaint-card {
+
+        padding: 16px;
 
     }
 
@@ -349,10 +536,46 @@ st.html("""
 
 
 # =========================================================
+# LOGOUT
+# =========================================================
+
+logout_col1, logout_col2 = st.columns(
+    [6, 1]
+)
+
+
+with logout_col2:
+
+    if st.button(
+        "🚪 Logout",
+        use_container_width=True
+    ):
+
+        st.session_state.admin_authenticated = False
+
+        st.rerun()
+
+
+# =========================================================
 # LOAD COMPLAINTS
 # =========================================================
 
-complaints = get_complaints()
+try:
+
+    complaints = get_complaints()
+
+except Exception as e:
+
+    st.error(
+        "❌ Gagal mengambil data complaint dari database."
+    )
+
+    print(
+        "ADMIN DATABASE ERROR:",
+        e
+    )
+
+    st.stop()
 
 
 # =========================================================
@@ -363,22 +586,37 @@ total_complaints = len(
     complaints
 )
 
+
 pending_count = sum(
+
     1
+
     for complaint in complaints
+
     if complaint[5] == "Pending"
+
 )
+
 
 process_count = sum(
+
     1
+
     for complaint in complaints
+
     if complaint[5] == "Diproses"
+
 )
 
+
 done_count = sum(
+
     1
+
     for complaint in complaints
+
     if complaint[5] == "Selesai"
+
 )
 
 
@@ -529,11 +767,79 @@ for complaint in filtered_complaints:
 
 
     # =====================================================
-    # FORMAT WAKTU GMT+7
+    # CONVERT TIME TO GMT+7
     # =====================================================
 
-    created_at_display = format_datetime_gmt7(
-        created_at
+    try:
+
+        if created_at:
+
+            created_at_string = str(
+                created_at
+            )
+
+            # Supabase biasanya mengirim:
+            # 2026-08-23T15:26:21+00:00
+
+            dt = datetime.fromisoformat(
+                created_at_string.replace(
+                    "Z",
+                    "+00:00"
+                )
+            )
+
+
+            # Jika belum memiliki timezone
+            if dt.tzinfo is None:
+
+                dt = dt.replace(
+                    tzinfo=ZoneInfo("UTC")
+                )
+
+
+            dt_jakarta = dt.astimezone(
+                ZoneInfo("Asia/Jakarta")
+            )
+
+
+            formatted_time = dt_jakarta.strftime(
+                "%d/%m/%Y %H:%M"
+            )
+
+        else:
+
+            formatted_time = "-"
+
+
+    except Exception:
+
+        formatted_time = str(
+            created_at
+        )
+
+
+    # =====================================================
+    # ESCAPE DATA
+    # =====================================================
+
+    safe_id = escape(
+        str(complaint_id)
+    )
+
+    safe_name = escape(
+        str(customer_name)
+    )
+
+    safe_whatsapp = escape(
+        str(customer_whatsapp)
+    )
+
+    safe_complaint = escape(
+        str(complaint_text)
+    )
+
+    safe_time = escape(
+        str(formatted_time)
     )
 
 
@@ -545,21 +851,21 @@ for complaint in filtered_complaints:
     <div class="complaint-card">
 
         <div class="complaint-id">
-            LAPORAN #{complaint_id}
+            LAPORAN #{safe_id}
         </div>
 
         <div class="complaint-name">
-            {customer_name}
+            {safe_name}
         </div>
 
         <div class="complaint-info">
-            📱 {customer_whatsapp}
+            📱 {safe_whatsapp}
             &nbsp;&nbsp;•&nbsp;&nbsp;
-            🕒 {created_at_display}
+            🕒 {safe_time}
         </div>
 
         <div class="complaint-text">
-            {complaint_text}
+            {safe_complaint}
         </div>
 
     </div>
@@ -571,15 +877,25 @@ for complaint in filtered_complaints:
     # =====================================================
 
     status_options = [
+
         "Pending",
+
         "Diproses",
+
         "Selesai"
+
     ]
 
 
-    current_index = status_options.index(
-        status
-    )
+    if status in status_options:
+
+        current_index = status_options.index(
+            status
+        )
+
+    else:
+
+        current_index = 0
 
 
     new_status = st.selectbox(
@@ -597,20 +913,40 @@ for complaint in filtered_complaints:
 
     if new_status != status:
 
-        update_complaint_status(
+        try:
 
-            complaint_id,
+            update_complaint_status(
 
-            new_status
+                complaint_id,
 
-        )
+                new_status
 
-        st.success(
-            f"Status laporan #{complaint_id} "
-            f"berhasil diubah menjadi {new_status}."
-        )
+            )
 
-        st.rerun()
+            st.success(
+
+                f"Status laporan #{complaint_id} "
+                f"berhasil diubah menjadi "
+                f"{new_status}."
+
+            )
+
+            st.rerun()
+
+
+        except Exception as e:
+
+            st.error(
+
+                f"Gagal mengubah status "
+                f"laporan #{complaint_id}."
+
+            )
+
+            print(
+                "UPDATE STATUS ERROR:",
+                e
+            )
 
 
     st.divider()
