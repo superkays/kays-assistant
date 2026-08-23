@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import os
 import re
 
+load_dotenv()
+
 from openai import OpenAI
 
 from database import (
@@ -1516,18 +1518,23 @@ def process_complete_complaint(prompt):
             )
 
 
+
         except Exception as e:
 
             print(
-                "ERROR COMPLETE COMPLAINT:",
+
+                "ERROR SAVE COMPLAINT:",
+
                 e
+
             )
 
+            answer = (
 
-            return (
-                "Maaf kak, komplain belum berhasil "
-                "disimpan. 😔\n\n"
-                "Silakan coba kirim kembali informasinya."
+                "❌ Gagal menyimpan komplain.\n\n"
+
+                f"Error: {str(e)}"
+
             )
 
 
