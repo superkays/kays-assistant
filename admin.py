@@ -1,4 +1,6 @@
 import streamlit as st
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from database import (
     create_database,
@@ -24,6 +26,63 @@ st.set_page_config(
 # =========================================================
 
 create_database()
+
+
+# =========================================================
+# TIMEZONE
+# =========================================================
+
+def format_datetime_gmt7(created_at):
+
+    if not created_at:
+
+        return "-"
+
+    try:
+
+        # -------------------------------------------------
+        # Ubah menjadi datetime
+        # -------------------------------------------------
+
+        dt = datetime.fromisoformat(
+            str(created_at).replace(
+                "Z",
+                "+00:00"
+            )
+        )
+
+        # -------------------------------------------------
+        # Jika tidak memiliki timezone,
+        # anggap data berasal dari UTC
+        # -------------------------------------------------
+
+        if dt.tzinfo is None:
+
+            dt = dt.replace(
+                tzinfo=ZoneInfo("UTC")
+            )
+
+        # -------------------------------------------------
+        # Konversi UTC → Asia/Jakarta
+        # GMT+7
+        # -------------------------------------------------
+
+        dt_gmt7 = dt.astimezone(
+            ZoneInfo("Asia/Jakarta")
+        )
+
+        # -------------------------------------------------
+        # Format tampilan
+        # DD/MM/YYYY HH:MM
+        # -------------------------------------------------
+
+        return dt_gmt7.strftime(
+            "%d/%m/%Y %H:%M"
+        )
+
+    except Exception:
+
+        return str(created_at)
 
 
 # =========================================================
@@ -470,6 +529,15 @@ for complaint in filtered_complaints:
 
 
     # =====================================================
+    # FORMAT WAKTU GMT+7
+    # =====================================================
+
+    created_at_display = format_datetime_gmt7(
+        created_at
+    )
+
+
+    # =====================================================
     # COMPLAINT CARD
     # =====================================================
 
@@ -487,7 +555,7 @@ for complaint in filtered_complaints:
         <div class="complaint-info">
             📱 {customer_whatsapp}
             &nbsp;&nbsp;•&nbsp;&nbsp;
-            🕒 {created_at}
+            🕒 {created_at_display}
         </div>
 
         <div class="complaint-text">
