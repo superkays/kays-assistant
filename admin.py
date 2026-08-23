@@ -232,11 +232,10 @@ if not st.session_state.admin_authenticated:
                 "di Streamlit Secrets."
             )
 
+
         elif password_input == ADMIN_PASSWORD:
 
             st.session_state.admin_authenticated = True
-
-            st.session_state.admin_password_input = ""
 
             st.rerun()
 
