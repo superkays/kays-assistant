@@ -1,11 +1,14 @@
 import streamlit as st
 from dotenv import load_dotenv
 import os
+import re
+
 from openai import OpenAI
 
-from ai_order import parse_order
-from process_order import process_order
-from database import create_database
+from database import (
+    create_database,
+    save_complaint
+)
 
 
 # =========================================================
@@ -24,7 +27,6 @@ st.set_page_config(
 # DATABASE
 # =========================================================
 
-# Pastikan database dan tabel orders tersedia
 create_database()
 
 
@@ -41,16 +43,23 @@ load_dotenv()
 
 api_key = None
 
+
 # Prioritas 1: Streamlit Secrets
 try:
+
     api_key = st.secrets["OPENAI_API_KEY"]
+
 except Exception:
+
     pass
 
 
 # Prioritas 2: .env / environment variable
 if not api_key:
-    api_key = os.getenv("OPENAI_API_KEY")
+
+    api_key = os.getenv(
+        "OPENAI_API_KEY"
+    )
 
 
 # Jika API key tidak ditemukan
@@ -81,6 +90,7 @@ knowledge_base = """
 KAYS KITCHEN
 UMKM Ricebowl Ayam Popcorn
 
+
 MENU:
 
 1. Kays Ricebowl - Rp18.000
@@ -99,8 +109,9 @@ OPERASIONAL:
 
 PEMESANAN:
 
-- Cara order: WhatsApp
-- Nomor WhatsApp: 085882101190
+- Mika tidak menerima pesanan.
+- Mika tidak memproses pesanan.
+- Pemesanan dilakukan melalui sistem pemesanan Kays Kitchen.
 - Delivery: Bisa
 - Area delivery: Sekitar Bandar Lampung
 - Pembayaran: Transfer / QRIS
@@ -110,7 +121,8 @@ KEBIJAKAN:
 
 - Pembatalan dapat dilakukan sebelum produk dikirim.
 - Refund diberikan jika makanan rusak atau tumpah.
-- Komplain melalui chatbot dan nanti akan disampaikan kepada Owner..
+- Komplain dapat disampaikan melalui Mika.
+- Komplain akan dicatat dan diteruskan kepada Admin Kays Kitchen.
 
 
 PROMO:
@@ -125,51 +137,160 @@ PROMO:
 # =========================================================
 
 instructions = f"""
-Kamu adalah AI Customer Service Kays Kitchen,
+Kamu adalah AI Customer Service Kays Kitchen
 bernama Mika.
 
-Kays Kitchen adalah UMKM yang menjual ricebowl ayam popcorn.
+Tugas utama kamu hanya:
 
-Tugas kamu adalah membantu customer dengan ramah,
-singkat, natural, dan jelas.
+1. Menjawab pertanyaan customer.
+2. Membantu customer yang ingin menyampaikan komplain.
 
-Jawab hanya pertanyaan yang ditanyakan oleh customer.
+Kamu BUKAN sistem pemesanan.
 
-Jangan memberikan informasi tambahan yang tidak diperlukan.
 
-Jika customer menawarkan atau menanyakan sesuatu yang
-tidak ada di Knowledge Base, jangan mengarang jawaban.
+=========================================================
+GAYA BICARA
+=========================================================
 
-Jika informasi tidak tersedia, katakan bahwa informasi
-tersebut belum tersedia.
+- Ramah.
+- Natural.
+- Singkat.
+- Jelas.
+- Panggil customer dengan "kak".
+- Jangan terlalu formal.
+- Jangan memberikan informasi yang tidak diperlukan.
 
-Jika customer membutuhkan informasi lebih lanjut di luar
-Knowledge Base, arahkan customer untuk menghubungi WhatsApp
-Kays Kitchen di:
 
-085882101190
+=========================================================
+ATURAN INFORMASI
+=========================================================
 
-ATURAN WHATSAPP:
+Jawab berdasarkan Knowledge Base.
 
-- Hanya berikan nomor WhatsApp jika customer meminta nomor.
-- Berikan nomor WhatsApp jika pertanyaan customer tidak
-  dapat dijawab berdasarkan Knowledge Base.
-- Jika kamu menawarkan nomor WhatsApp dan customer menjawab
-  "mau", "iya", "boleh", atau maksud yang sama,
-  segera berikan nomor WhatsApp.
+Jangan mengarang informasi.
 
-ATURAN PERCAKAPAN:
+Jika informasi tidak tersedia:
 
-- Panggil customer dengan sebutan kak.
-- Jika percakapan sudah berjalan, jangan memperkenalkan diri
-  sebagai Mika lagi.
-- Jangan mengulang salam jika tidak diperlukan.
-- Jika customer bercanda, kamu boleh membalas dengan ringan.
-- Tetap sopan dan ramah.
-- Jangan membuat harga, menu, promo, jam buka, atau kebijakan
-  yang tidak ada di Knowledge Base.
+"Maaf kak, informasi tersebut belum tersedia."
 
-Knowledge Base:
+
+=========================================================
+ATURAN PEMESANAN
+=========================================================
+
+Mika TIDAK menerima pesanan.
+
+Mika TIDAK memproses pesanan.
+
+Mika TIDAK menghitung total pesanan.
+
+Mika TIDAK menghitung harga pesanan.
+
+Mika TIDAK menyimpan data pesanan.
+
+Jika customer mengatakan:
+
+"saya mau pesan"
+
+atau:
+
+"mau order"
+
+atau:
+
+"saya mau beli"
+
+jawab dengan sopan bahwa Mika adalah Customer Service
+dan tidak memproses pesanan.
+
+
+JANGAN memberikan nomor WhatsApp Kays Kitchen.
+
+
+=========================================================
+ATURAN WHATSAPP
+=========================================================
+
+Mika TIDAK memiliki tugas memberikan nomor WhatsApp
+Kays Kitchen.
+
+Jangan pernah memberikan nomor WhatsApp Kays Kitchen.
+
+Jika customer meminta nomor WhatsApp Admin untuk
+komplain, jelaskan bahwa komplain dapat dicatat
+langsung melalui Mika.
+
+
+=========================================================
+ATURAN KOMPLAIN
+=========================================================
+
+Jika customer menyampaikan komplain:
+
+- Minta maaf.
+- Tunjukkan bahwa Mika memahami masalah customer.
+- Bantu proses pencatatan komplain.
+
+Sistem akan meminta:
+
+1. Nama customer.
+2. Nomor WhatsApp customer.
+3. Isi komplain.
+
+Jangan meminta nomor WhatsApp Kays Kitchen.
+
+Nomor yang diminta adalah nomor WhatsApp MILIK CUSTOMER.
+
+
+=========================================================
+ATURAN PENTING NAMA CUSTOMER
+=========================================================
+
+JANGAN pernah menganggap kata-kata seperti:
+
+- tumpah
+- kurang
+- rusak
+- bocor
+- salah
+- makanan
+- pesanan
+- komplain
+- keluhan
+- sambal
+- nasi
+- telat
+- terlambat
+- kendala
+- masalah
+
+sebagai nama customer.
+
+Nama customer harus berasal dari informasi yang jelas
+dari customer.
+
+
+=========================================================
+SETELAH KOMPLAIN TERCATAT
+=========================================================
+
+Beritahu customer:
+
+"Komplain kakak sudah berhasil saya catat dan akan
+disampaikan kepada Admin Kays Kitchen untuk
+ditindaklanjuti.
+
+Admin akan menghubungi kakak melalui WhatsApp yang
+sudah diberikan."
+
+
+Jangan mengatakan Admin sudah menghubungi customer
+sebelum benar-benar dilakukan.
+
+
+=========================================================
+KNOWLEDGE BASE
+=========================================================
 
 {knowledge_base}
 """
@@ -784,6 +905,43 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
+# ---------------------------------------------------------
+# COMPLAINT STATE
+# ---------------------------------------------------------
+
+if "complaint_active" not in st.session_state:
+
+    st.session_state.complaint_active = False
+
+
+if "complaint_step" not in st.session_state:
+
+    st.session_state.complaint_step = None
+
+
+# ---------------------------------------------------------
+# CUSTOMER PROFILE
+# ---------------------------------------------------------
+
+if "customer_name" not in st.session_state:
+
+    st.session_state.customer_name = ""
+
+
+if "customer_whatsapp" not in st.session_state:
+
+    st.session_state.customer_whatsapp = ""
+
+
+# ---------------------------------------------------------
+# CURRENT COMPLAINT
+# ---------------------------------------------------------
+
+if "complaint_text" not in st.session_state:
+
+    st.session_state.complaint_text = ""
+
+
 # =========================================================
 # DISPLAY CHAT HISTORY
 # =========================================================
@@ -800,57 +958,637 @@ for message in st.session_state.messages:
 
 
 # =========================================================
-# ORDER DETECTION
+# PHONE NUMBER VALIDATION
 # =========================================================
 
-def is_order_message(text):
+def extract_phone_number(text):
 
-    text = text.lower()
+    match = re.search(
+        r"(?:\+62|62|0)[\s\-()]?\d[\d\s\-()]{7,15}",
+        text
+    )
 
-    kata_pesan = [
+    if not match:
+
+        return None
+
+
+    phone = match.group(0)
+
+
+    # Hapus karakter selain angka
+    phone = re.sub(
+        r"\D",
+        "",
+        phone
+    )
+
+
+    # Normalisasi +62 / 62 menjadi 0
+    if phone.startswith("62"):
+
+        phone = "0" + phone[2:]
+
+
+    # Validasi nomor Indonesia sederhana
+    if (
+        phone.startswith("08")
+        and
+        10 <= len(phone) <= 14
+    ):
+
+        return phone
+
+
+    return None
+
+
+# =========================================================
+# EXTRACT NAME
+# =========================================================
+
+def extract_customer_name(text):
+
+    text_clean = text.strip()
+
+
+    # -----------------------------------------------------
+    # Pola:
+    # "saya Budi"
+    # "nama saya Budi"
+    # "aku Budi"
+    # -----------------------------------------------------
+
+    patterns = [
+
+        r"\bnama saya\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40})",
+
+        r"\bsaya\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40})",
+
+        r"\baku\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40})"
+
+    ]
+
+
+    # -----------------------------------------------------
+    # Kata yang TIDAK BOLEH dianggap nama
+    # -----------------------------------------------------
+
+    forbidden_words = [
 
         "mau",
+        "ingin",
         "pesan",
-        "pesen",
+        "pesanan",
         "order",
-        "ambil",
         "beli",
-        "pesanan"
+        "makan",
+        "makanan",
+        "minum",
+        "tumpah",
+        "kurang",
+        "kekurangan",
+        "rusak",
+        "bocor",
+        "salah",
+        "komplain",
+        "complain",
+        "keluhan",
+        "kendala",
+        "masalah",
+        "telat",
+        "terlambat",
+        "tidak",
+        "ga",
+        "gak",
+        "nggak",
+        "ada",
+        "sambal",
+        "nasi",
+        "ayam"
+    ]
+
+
+    for pattern in patterns:
+
+        match = re.search(
+            pattern,
+            text_clean,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            candidate = match.group(1).strip()
+
+
+            # Hapus bagian setelah koma
+            candidate = candidate.split(",")[0].strip()
+
+
+            # Hapus bagian setelah nomor WA
+            candidate = re.split(
+                r"\b(?:no|nomor|wa|whatsapp)\b",
+                candidate,
+                flags=re.IGNORECASE
+            )[0].strip()
+
+
+            words = candidate.split()
+
+
+            if not words:
+                continue
+
+
+            # Jangan terlalu panjang
+            if len(words) > 4:
+                continue
+
+
+            # Jika salah satu kata merupakan kata komplain,
+            # jangan dianggap sebagai nama
+            if any(
+                word.lower() in forbidden_words
+                for word in words
+            ):
+                continue
+
+
+            return candidate
+
+
+    return None
+
+
+# =========================================================
+# NAME VALIDATION
+# =========================================================
+
+def looks_like_name(text):
+
+    value = text.strip()
+
+
+    if not value:
+
+        return False
+
+
+    # -----------------------------------------------------
+    # Maksimal 4 kata
+    # -----------------------------------------------------
+
+    words = value.split()
+
+
+    if len(words) > 4:
+
+        return False
+
+
+    # -----------------------------------------------------
+    # Jangan menerima kalimat panjang sebagai nama
+    # -----------------------------------------------------
+
+    if len(value) > 50:
+
+        return False
+
+
+    # -----------------------------------------------------
+    # Kata-kata yang jelas bukan nama
+    # -----------------------------------------------------
+
+    forbidden_words = [
+
+        "mau",
+        "ingin",
+        "pesan",
+        "pesanan",
+        "order",
+        "beli",
+        "makan",
+        "makanan",
+        "minum",
+        "tumpah",
+        "kurang",
+        "kekurangan",
+        "rusak",
+        "bocor",
+        "salah",
+        "komplain",
+        "complain",
+        "keluhan",
+        "kendala",
+        "masalah",
+        "telat",
+        "terlambat",
+        "tidak",
+        "ga",
+        "gak",
+        "nggak",
+        "ada",
+        "sambal",
+        "nasi",
+        "ayam",
+        "pesanannya",
+        "pesanan saya",
+        "makanan saya"
+    ]
+
+
+    lowered = value.lower()
+
+
+    for forbidden in forbidden_words:
+
+        if forbidden in lowered:
+
+            return False
+
+
+    # -----------------------------------------------------
+    # Jika ada nomor WA, bukan nama murni
+    # -----------------------------------------------------
+
+    if extract_phone_number(value):
+
+        return False
+
+
+    # -----------------------------------------------------
+    # Nama tidak boleh mengandung angka
+    # -----------------------------------------------------
+
+    if re.search(
+        r"\d",
+        value
+    ):
+
+        return False
+
+
+    # -----------------------------------------------------
+    # Nama harus berisi huruf
+    # -----------------------------------------------------
+
+    if not re.search(
+        r"[A-Za-zÀ-ÿ]",
+        value
+    ):
+
+        return False
+
+
+    return True
+
+
+# =========================================================
+# COMPLAINT DETECTION
+# =========================================================
+
+def is_complaint_message(text):
+
+    text = text.lower().strip()
+
+
+    complaint_keywords = [
+
+        "komplain",
+        "complain",
+        "keluhan",
+        "mengeluh",
+
+        "kecewa",
+        "kecewain",
+
+        "rusak",
+        "tumpah",
+        "bocor",
+
+        "kurang",
+        "kekurangan",
+
+        "salah",
+        "kesalahan",
+
+        "beda",
+        "berbeda",
+        "tidak sesuai",
+        "ga sesuai",
+        "gak sesuai",
+
+        "tidak ada",
+        "ga ada",
+        "gak ada",
+
+        "belum datang",
+        "belum sampai",
+
+        "terlambat",
+        "telat",
+
+        "masalah",
+        "kendala",
+
+        "buruk",
+        "parah",
+
+        "porsi sedikit",
+        "makanan sedikit",
+
+        "makanan dingin",
+        "nasi dingin",
+
+        "pesanan salah",
+        "pesanan kurang"
 
     ]
 
-    kata_menu = [
 
-        "sambal matah",
-        "sambal bawang",
-        "matah",
-        "bawang",
-        "ricebowl"
-
-    ]
-
-    ada_kata_pesan = any(
-        kata in text
-        for kata in kata_pesan
+    return any(
+        keyword in text
+        for keyword in complaint_keywords
     )
 
-    ada_kata_menu = any(
-        kata in text
-        for kata in kata_menu
+
+# =========================================================
+# CLEAN COMPLAINT TEXT
+# =========================================================
+
+def clean_complaint_text(text):
+
+    complaint = text.strip()
+
+
+    # -----------------------------------------------------
+    # Hapus informasi nama
+    # -----------------------------------------------------
+
+    complaint = re.sub(
+        r"\bnama saya\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}",
+        "",
+        complaint,
+        flags=re.IGNORECASE
     )
 
-    ada_angka = any(
-        char.isdigit()
-        for char in text
+
+    complaint = re.sub(
+        r"\bsaya\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}",
+        "",
+        complaint,
+        flags=re.IGNORECASE
     )
 
-    return (
-        ada_kata_pesan
-        and
-        ada_kata_menu
-        and
-        ada_angka
+
+    # -----------------------------------------------------
+    # Hapus nomor WA
+    # -----------------------------------------------------
+
+    phone = extract_phone_number(
+        complaint
     )
+
+
+    if phone:
+
+        complaint = complaint.replace(
+            phone,
+            ""
+        )
+
+
+    # -----------------------------------------------------
+    # Hapus label umum
+    # -----------------------------------------------------
+
+    complaint = re.sub(
+        r"\b(?:no|nomor|wa|whatsapp)\b",
+        "",
+        complaint,
+        flags=re.IGNORECASE
+    )
+
+
+    complaint = re.sub(
+        r"\s+",
+        " ",
+        complaint
+    ).strip()
+
+
+    complaint = complaint.strip(
+        " ,.-:"
+    )
+
+
+    return complaint
+
+
+# =========================================================
+# SAVE CURRENT COMPLAINT
+# =========================================================
+
+def save_current_complaint():
+
+    complaint_id = save_complaint(
+
+        st.session_state.customer_name,
+
+        st.session_state.customer_whatsapp,
+
+        st.session_state.complaint_text
+
+    )
+
+
+    return complaint_id
+
+
+# =========================================================
+# RESET COMPLAINT PROCESS
+# =========================================================
+
+def reset_complaint_process():
+
+    # -----------------------------------------------------
+    # PENTING:
+    # Nama dan WhatsApp TIDAK dihapus.
+    # -----------------------------------------------------
+
+    st.session_state.complaint_active = False
+
+    st.session_state.complaint_step = None
+
+    st.session_state.complaint_text = ""
+
+
+# =========================================================
+# START COMPLAINT FROM COMPLETE MESSAGE
+# =========================================================
+
+def process_complete_complaint(prompt):
+
+    phone = extract_phone_number(
+        prompt
+    )
+
+
+    name = extract_customer_name(
+        prompt
+    )
+
+
+    complaint = clean_complaint_text(
+        prompt
+    )
+
+
+    # -----------------------------------------------------
+    # Jika nama ditemukan
+    # -----------------------------------------------------
+
+    if name:
+
+        st.session_state.customer_name = name
+
+
+    # -----------------------------------------------------
+    # Jika WA ditemukan
+    # -----------------------------------------------------
+
+    if phone:
+
+        st.session_state.customer_whatsapp = phone
+
+
+    # -----------------------------------------------------
+    # Jika complaint terdeteksi
+    # -----------------------------------------------------
+
+    if complaint and is_complaint_message(prompt):
+
+        st.session_state.complaint_text = complaint
+
+
+    # -----------------------------------------------------
+    # Tentukan data yang masih kurang
+    # -----------------------------------------------------
+
+    missing_name = (
+        not st.session_state.customer_name
+    )
+
+
+    missing_whatsapp = (
+        not st.session_state.customer_whatsapp
+    )
+
+
+    missing_complaint = (
+        not st.session_state.complaint_text
+    )
+
+
+    # -----------------------------------------------------
+    # SEMUA LENGKAP
+    # -----------------------------------------------------
+
+    if not missing_name and not missing_whatsapp and not missing_complaint:
+
+        try:
+
+            complaint_id = save_current_complaint()
+
+
+            reset_complaint_process()
+
+
+            return (
+                "Baik kak, terima kasih informasinya. 🙏\n\n"
+                "Komplain kakak sudah berhasil saya catat "
+                f"dengan nomor laporan **#{complaint_id}**.\n\n"
+                "Komplain akan disampaikan kepada Admin "
+                "Kays Kitchen untuk ditindaklanjuti.\n\n"
+                "Admin akan menghubungi kakak melalui "
+                "WhatsApp yang sudah diberikan."
+            )
+
+
+        except Exception as e:
+
+            print(
+                "ERROR COMPLETE COMPLAINT:",
+                e
+            )
+
+
+            return (
+                "Maaf kak, komplain belum berhasil "
+                "disimpan. 😔\n\n"
+                "Silakan coba kirim kembali informasinya."
+            )
+
+
+    # -----------------------------------------------------
+    # NAMA BELUM ADA
+    # -----------------------------------------------------
+
+    if missing_name:
+
+        st.session_state.complaint_active = True
+
+        st.session_state.complaint_step = "name"
+
+
+        return (
+            "Mohon maaf ya kak atas kendalanya 🙏\n\n"
+            "Saya bantu catat komplainnya agar dapat "
+            "ditindaklanjuti oleh Admin Kays Kitchen.\n\n"
+            "Boleh saya tahu nama kakak?"
+        )
+
+
+    # -----------------------------------------------------
+    # WHATSAPP BELUM ADA
+    # -----------------------------------------------------
+
+    if missing_whatsapp:
+
+        st.session_state.complaint_active = True
+
+        st.session_state.complaint_step = "whatsapp"
+
+
+        return (
+            f"Baik kak {st.session_state.customer_name}. "
+            "Saya bantu catat komplainnya. 🙏\n\n"
+            "Boleh saya minta nomor WhatsApp kakak "
+            "yang bisa dihubungi Admin?"
+        )
+
+
+    # -----------------------------------------------------
+    # COMPLAINT BELUM ADA
+    # -----------------------------------------------------
+
+    if missing_complaint:
+
+        st.session_state.complaint_active = True
+
+        st.session_state.complaint_step = "complaint"
+
+
+        return (
+            f"Terima kasih, kak "
+            f"{st.session_state.customer_name}. 🙏\n\n"
+            "Sekarang boleh ceritakan secara detail "
+            "kendala atau komplain yang kakak alami?"
+        )
+
+
+    return None
 
 
 # =========================================================
@@ -886,135 +1624,577 @@ if prompt:
         st.write(prompt)
 
 
+    answer = None
+
+
     # =====================================================
-    # ORDER
+    # ACTIVE COMPLAINT FLOW
     # =====================================================
 
-    if is_order_message(prompt):
+    if st.session_state.complaint_active:
 
-        try:
 
-            # =============================================
-            # PARSE ORDER
-            # =============================================
+        # =================================================
+        # STEP NAME
+        # =================================================
 
-            order_data = parse_order(
-                client,
+        if (
+            st.session_state.complaint_step
+            == "name"
+        ):
+
+            # ------------------------------------------------
+            # Coba cari nama dari kalimat
+            # ------------------------------------------------
+
+            detected_name = extract_customer_name(
                 prompt
             )
 
 
-            sambal_matah = int(
-                order_data["sambal_matah"]
+            # ------------------------------------------------
+            # Jika nama ditemukan
+            # ------------------------------------------------
+
+            if detected_name:
+
+                st.session_state.customer_name = (
+                    detected_name
+                )
+
+
+            # ------------------------------------------------
+            # Jika user hanya memberikan nama
+            # ------------------------------------------------
+
+            elif looks_like_name(prompt):
+
+                st.session_state.customer_name = (
+                    prompt.strip()
+                )
+
+
+            # ------------------------------------------------
+            # Jika ternyata masih isi komplain
+            # ------------------------------------------------
+
+            else:
+
+                # --------------------------------------------
+                # PENTING:
+                # Jangan buang komplain awal.
+                # --------------------------------------------
+
+                if is_complaint_message(prompt):
+
+                    st.session_state.complaint_text = (
+                        clean_complaint_text(prompt)
+                    )
+
+
+                answer = (
+                    "Mohon maaf ya kak atas kendalanya 🙏\n\n"
+                    "Saya bantu catat komplainnya.\n\n"
+                    "Boleh saya tahu nama kakak?"
+                )
+
+
+            # ------------------------------------------------
+            # Kalau nama berhasil ditemukan
+            # ------------------------------------------------
+
+            if (
+                not answer
+                and
+                st.session_state.customer_name
+            ):
+
+                # --------------------------------------------
+                # Jika WA juga ada dalam pesan yang sama
+                # --------------------------------------------
+
+                phone = extract_phone_number(
+                    prompt
+                )
+
+
+                if phone:
+
+                    st.session_state.customer_whatsapp = (
+                        phone
+                    )
+
+
+                # --------------------------------------------
+                # Kalau complaint juga ada
+                # --------------------------------------------
+
+                if is_complaint_message(prompt):
+
+                    complaint = clean_complaint_text(
+                        prompt
+                    )
+
+
+                    if complaint:
+
+                        st.session_state.complaint_text = (
+                            complaint
+                        )
+
+
+                # --------------------------------------------
+                # Tentukan langkah berikutnya
+                # --------------------------------------------
+
+                if not st.session_state.customer_whatsapp:
+
+                    st.session_state.complaint_step = (
+                        "whatsapp"
+                    )
+
+
+                    answer = (
+                        f"Terima kasih, kak "
+                        f"{st.session_state.customer_name}. 😊\n\n"
+                        "Boleh saya minta nomor WhatsApp kakak "
+                        "yang bisa dihubungi Admin untuk "
+                        "menindaklanjuti komplain ini?"
+                    )
+
+
+                elif not st.session_state.complaint_text:
+
+                    st.session_state.complaint_step = (
+                        "complaint"
+                    )
+
+
+                    answer = (
+                        "Terima kasih, kak. 🙏\n\n"
+                        "Sekarang boleh ceritakan secara detail "
+                        "kendala atau komplain yang kakak alami?"
+                    )
+
+
+                else:
+
+                    try:
+
+                        complaint_id = save_current_complaint()
+
+
+                        reset_complaint_process()
+
+
+                        answer = (
+                            "Baik kak, terima kasih informasinya. 🙏\n\n"
+                            "Komplain kakak sudah berhasil saya catat "
+                            f"dengan nomor laporan **#{complaint_id}**.\n\n"
+                            "Komplain akan disampaikan kepada Admin "
+                            "Kays Kitchen untuk ditindaklanjuti.\n\n"
+                            "Admin akan menghubungi kakak melalui "
+                            "WhatsApp yang sudah diberikan."
+                        )
+
+
+                    except Exception as e:
+
+                        print(
+                            "ERROR SAVE COMPLAINT:",
+                            e
+                        )
+
+
+                        answer = (
+                            "Maaf kak, komplain belum berhasil "
+                            "disimpan. 😔\n\n"
+                            "Silakan coba lagi."
+                        )
+
+
+        # =================================================
+        # STEP WHATSAPP
+        # =================================================
+
+        elif (
+            st.session_state.complaint_step
+            == "whatsapp"
+        ):
+
+            phone = extract_phone_number(
+                prompt
             )
 
 
-            sambal_bawang = int(
-                order_data["sambal_bawang"]
+            if not phone:
+
+                answer = (
+                    "Maaf kak, saya belum bisa mengenali "
+                    "nomor WhatsAppnya. 🙏\n\n"
+                    "Boleh kirim nomor WhatsApp kakak, "
+                    "contohnya 081234567890?"
+                )
+
+
+            else:
+
+                st.session_state.customer_whatsapp = (
+                    phone
+                )
+
+
+                # --------------------------------------------
+                # Kalau complaint sudah disimpan sementara
+                # --------------------------------------------
+
+                if st.session_state.complaint_text:
+
+                    try:
+
+                        complaint_id = save_current_complaint()
+
+
+                        reset_complaint_process()
+
+
+                        answer = (
+                            "Terima kasih, kak. 🙏\n\n"
+                            "Komplain kakak sudah berhasil saya "
+                            f"catat dengan nomor laporan **#{complaint_id}**.\n\n"
+                            "Komplain akan disampaikan kepada Admin "
+                            "Kays Kitchen untuk ditindaklanjuti.\n\n"
+                            "Admin akan menghubungi kakak melalui "
+                            "WhatsApp yang sudah diberikan."
+                        )
+
+
+                    except Exception as e:
+
+                        print(
+                            "ERROR SAVE COMPLAINT:",
+                            e
+                        )
+
+
+                        answer = (
+                            "Maaf kak, komplain belum berhasil "
+                            "disimpan. 😔\n\n"
+                            "Silakan coba lagi."
+                        )
+
+
+                else:
+
+                    st.session_state.complaint_step = (
+                        "complaint"
+                    )
+
+
+                    answer = (
+                        "Terima kasih, kak. 🙏\n\n"
+                        "Sekarang boleh ceritakan secara detail "
+                        "kendala atau komplain yang kakak alami?"
+                    )
+
+
+        # =================================================
+        # STEP COMPLAINT
+        # =================================================
+
+        elif (
+            st.session_state.complaint_step
+            == "complaint"
+        ):
+
+            st.session_state.complaint_text = (
+                clean_complaint_text(prompt)
             )
 
 
-            # =============================================
-            # CUSTOMER NAME
-            # =============================================
+            if not st.session_state.complaint_text:
 
-            customer_name = "Customer"
-
-
-            # =============================================
-            # PROCESS ORDER
-            # =============================================
-
-            process_order(
-
-                customer_name,
-
-                sambal_matah,
-
-                sambal_bawang
-
-            )
+                answer = (
+                    "Boleh ceritakan sedikit lebih detail "
+                    "tentang kendalanya ya kak? 🙏"
+                )
 
 
-            # =============================================
-            # CALCULATE TOTAL
-            # =============================================
+            else:
 
-            total_porsi = (
-                sambal_matah
-                +
-                sambal_bawang
-            )
+                try:
+
+                    complaint_id = save_current_complaint()
 
 
-            total_harga = (
-                total_porsi
-                *
-                18000
-            )
+                    reset_complaint_process()
 
 
-            # =============================================
-            # FORMAT PRICE
-            # =============================================
-
-            harga_format = (
-                f"Rp {total_harga:,}"
-                .replace(",", ".")
-            )
-
-
-            # =============================================
-            # RESPONSE
-            # =============================================
-
-            answer = f"""
-            🎉 **Pesanan berhasil diproses!**
-
-            👤 **Customer**
-            {customer_name}
-
-            🌶️ **Detail Pesanan**
-
-            Sambal Matah : {sambal_matah} porsi  
-            Sambal Bawang : {sambal_bawang} porsi  
-
-            🍚 **Total Porsi**
-            {total_porsi} porsi
-
-            💰 **Total Harga**
-            **{harga_format}**
-
-            Terima kasih sudah memesan di **Kays Kitchen**! ❤️
-            """
+                    answer = (
+                        "Baik kak, terima kasih informasinya. 🙏\n\n"
+                        "Komplain kakak sudah berhasil saya catat "
+                        f"dengan nomor laporan **#{complaint_id}**.\n\n"
+                        "Komplain akan disampaikan kepada Admin "
+                        "Kays Kitchen untuk ditindaklanjuti.\n\n"
+                        "Admin akan menghubungi kakak melalui "
+                        "WhatsApp yang sudah diberikan."
+                    )
 
 
-        except Exception as e:
+                except Exception as e:
 
-            answer = (
-                "Maaf, pesanan belum berhasil "
-                "diproses. 😔"
-            )
+                    print(
+                        "ERROR SAVE COMPLAINT:",
+                        e
+                    )
 
-            print(
-                "ERROR ORDER:",
-                e
-            )
+
+                    answer = (
+                        "Maaf kak, komplain belum berhasil "
+                        "disimpan. 😔\n\n"
+                        "Silakan coba lagi."
+                    )
 
 
     # =====================================================
-    # CUSTOMER SERVICE
+    # START NEW COMPLAINT
     # =====================================================
 
-    else:
+    elif is_complaint_message(prompt):
+
+        # -------------------------------------------------
+        # Jika customer sudah dikenal
+        # -------------------------------------------------
+
+        if (
+            st.session_state.customer_name
+            and
+            st.session_state.customer_whatsapp
+        ):
+
+            # ---------------------------------------------
+            # Simpan komplain langsung
+            # ---------------------------------------------
+
+            st.session_state.complaint_text = (
+                clean_complaint_text(prompt)
+            )
+
+
+            if st.session_state.complaint_text:
+
+                try:
+
+                    complaint_id = save_current_complaint()
+
+
+                    answer = (
+                        f"Baik kak "
+                        f"{st.session_state.customer_name}, "
+                        "saya bantu catat komplainnya. 🙏\n\n"
+                        "Komplain kakak sudah berhasil saya catat "
+                        f"dengan nomor laporan **#{complaint_id}**.\n\n"
+                        "Komplain akan disampaikan kepada Admin "
+                        "Kays Kitchen untuk ditindaklanjuti.\n\n"
+                        "Admin akan menghubungi kakak melalui "
+                        "WhatsApp yang sudah diberikan."
+                    )
+
+
+                    reset_complaint_process()
+
+
+                except Exception as e:
+
+                    print(
+                        "ERROR SAVE KNOWN CUSTOMER:",
+                        e
+                    )
+
+
+                    answer = (
+                        "Maaf kak, komplain belum berhasil "
+                        "disimpan. 😔"
+                    )
+
+
+            else:
+
+                st.session_state.complaint_active = True
+
+                st.session_state.complaint_step = (
+                    "complaint"
+                )
+
+
+                answer = (
+                    "Baik kak, saya bantu catat komplainnya. 🙏\n\n"
+                    "Boleh ceritakan detail kendalanya?"
+                )
+
+
+        # -------------------------------------------------
+        # Customer belum dikenal
+        # -------------------------------------------------
+
+        else:
+
+            st.session_state.complaint_active = True
+
+            st.session_state.complaint_step = "name"
+
+
+            # ---------------------------------------------
+            # Simpan complaint yang sudah diberikan
+            # ---------------------------------------------
+
+            complaint = clean_complaint_text(
+                prompt
+            )
+
+
+            if complaint:
+
+                st.session_state.complaint_text = (
+                    complaint
+                )
+
+
+            # ---------------------------------------------
+            # Coba ambil nama + WA jika langsung diberikan
+            # ---------------------------------------------
+
+            detected_name = extract_customer_name(
+                prompt
+            )
+
+
+            detected_phone = extract_phone_number(
+                prompt
+            )
+
+
+            if detected_name:
+
+                st.session_state.customer_name = (
+                    detected_name
+                )
+
+
+            if detected_phone:
+
+                st.session_state.customer_whatsapp = (
+                    detected_phone
+                )
+
+
+            # ---------------------------------------------
+            # Semua lengkap
+            # ---------------------------------------------
+
+            if (
+                st.session_state.customer_name
+                and
+                st.session_state.customer_whatsapp
+                and
+                st.session_state.complaint_text
+            ):
+
+                try:
+
+                    complaint_id = save_current_complaint()
+
+
+                    reset_complaint_process()
+
+
+                    answer = (
+                        "Baik kak, terima kasih informasinya. 🙏\n\n"
+                        "Komplain kakak sudah berhasil saya catat "
+                        f"dengan nomor laporan **#{complaint_id}**.\n\n"
+                        "Komplain akan disampaikan kepada Admin "
+                        "Kays Kitchen untuk ditindaklanjuti.\n\n"
+                        "Admin akan menghubungi kakak melalui "
+                        "WhatsApp yang sudah diberikan."
+                    )
+
+
+                except Exception as e:
+
+                    print(
+                        "ERROR SAVE COMPLETE:",
+                        e
+                    )
+
+
+                    answer = (
+                        "Maaf kak, komplain belum berhasil "
+                        "disimpan. 😔"
+                    )
+
+
+            # ---------------------------------------------
+            # Nama sudah ada
+            # ---------------------------------------------
+
+            elif st.session_state.customer_name:
+
+                if st.session_state.customer_whatsapp:
+
+                    st.session_state.complaint_step = (
+                        "complaint"
+                    )
+
+
+                    answer = (
+                        f"Baik kak "
+                        f"{st.session_state.customer_name}. 🙏\n\n"
+                        "Boleh ceritakan detail kendalanya?"
+                    )
+
+
+                else:
+
+                    st.session_state.complaint_step = (
+                        "whatsapp"
+                    )
+
+
+                    answer = (
+                        f"Baik kak "
+                        f"{st.session_state.customer_name}. 😊\n\n"
+                        "Boleh saya minta nomor WhatsApp kakak "
+                        "yang bisa dihubungi Admin?"
+                    )
+
+
+            # ---------------------------------------------
+            # Nama belum ada
+            # ---------------------------------------------
+
+            else:
+
+                st.session_state.complaint_step = "name"
+
+
+                answer = (
+                    "Mohon maaf ya kak atas kendalanya 🙏\n\n"
+                    "Saya bantu catat komplainnya agar dapat "
+                    "ditindaklanjuti oleh Admin Kays Kitchen.\n\n"
+                    "Boleh saya tahu nama kakak?"
+                )
+
+
+    # =====================================================
+    # NORMAL CUSTOMER SERVICE
+    # =====================================================
+
+    if answer is None:
 
         try:
 
-            # =============================================
-            # KIRIM HISTORY CHAT KE AI
-            # =============================================
-
             chat_history = []
+
 
             for message in st.session_state.messages:
 
@@ -1026,10 +2206,6 @@ if prompt:
 
                 })
 
-
-            # =============================================
-            # AI RESPONSE
-            # =============================================
 
             response = client.responses.create(
 
@@ -1052,8 +2228,9 @@ if prompt:
                 e
             )
 
+
             answer = (
-                "Maaf, Mika sedang mengalami "
+                "Maaf kak, Mika sedang mengalami "
                 "gangguan koneksi. 😔\n\n"
                 "Silakan coba beberapa saat lagi."
             )
