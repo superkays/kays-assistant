@@ -186,7 +186,7 @@ if not st.session_state.admin_authenticated:
     <div class="login-card">
 
         <div class="login-logo">
-            🍗
+            📋
         </div>
 
         <div class="login-title">
