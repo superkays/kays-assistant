@@ -7,7 +7,8 @@ from openai import OpenAI
 
 from database import (
     create_database,
-    save_complaint
+    save_complaint,
+    save_order
 )
 
 
@@ -109,9 +110,10 @@ OPERASIONAL:
 
 PEMESANAN:
 
-- Mika tidak menerima pesanan.
-- Mika tidak memproses pesanan.
-- Pemesanan dilakukan melalui sistem pemesanan Kays Kitchen.
+- Mika menyediakan tombol "ORDER SEKARANG"
+  untuk membantu customer membuat pesanan.
+- Customer dapat melakukan pemesanan melalui
+  sistem order yang tersedia di Mika.
 - Delivery: Bisa
 - Area delivery: Sekitar Bandar Lampung
 - Pembayaran: Transfer / QRIS
@@ -140,12 +142,12 @@ instructions = f"""
 Kamu adalah AI Customer Service Kays Kitchen
 bernama Mika.
 
-Tugas utama kamu hanya:
+Tugas utama kamu:
 
 1. Menjawab pertanyaan customer.
 2. Membantu customer yang ingin menyampaikan komplain.
-
-Kamu BUKAN sistem pemesanan.
+3. Mengarahkan customer ke tombol ORDER SEKARANG
+   jika customer ingin melakukan pemesanan.
 
 
 =========================================================
@@ -178,19 +180,24 @@ Jika informasi tidak tersedia:
 ATURAN PEMESANAN
 =========================================================
 
-Mika TIDAK menerima pesanan.
+Mika memiliki sistem pemesanan melalui tombol
+"ORDER SEKARANG".
 
-Mika TIDAK memproses pesanan.
+Jika customer mengatakan ingin memesan:
 
-Mika TIDAK menghitung total pesanan.
+- Arahkan customer untuk menggunakan tombol
+  "🛒 ORDER SEKARANG".
+- Jangan meminta data order melalui chat.
+- Jangan menghitung total pesanan melalui chat.
+- Jangan membuat nomor order melalui chat.
+- Jangan mengklaim bahwa order sudah tersimpan
+  jika customer belum mengirimkan order melalui
+  sistem order.
 
-Mika TIDAK menghitung harga pesanan.
+Contoh jawaban:
 
-Mika TIDAK menyimpan data pesanan.
-
-Jika customer mengatakan ingin memesan,
-jelaskan bahwa Mika adalah Customer Service
-dan tidak memproses pesanan.
+"Tentu kak 😊 Silakan tekan tombol
+🛒 ORDER SEKARANG untuk membuat pesanan."
 
 
 JANGAN memberikan nomor WhatsApp Kays Kitchen.
@@ -253,7 +260,8 @@ JANGAN pernah menganggap kata-kata seperti:
 - kendala
 - masalah
 - sedikit
-- isinya sedikit
+- tumpe
+- tumpeh
 
 sebagai nama customer.
 
@@ -564,6 +572,154 @@ footer {
 
 
 /* =====================================================
+   ORDER CARD
+   ===================================================== */
+
+.order-card {
+
+    width: 100%;
+
+    padding: 22px;
+
+    margin-top: 20px;
+    margin-bottom: 12px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(249, 115, 22, 0.18),
+            rgba(234, 88, 12, 0.08)
+        );
+
+    border:
+        1px solid
+        rgba(249, 115, 22, 0.30);
+
+    border-radius: 22px;
+
+    box-sizing: border-box;
+
+}
+
+
+.order-title {
+
+    color: white;
+
+    font-size: 18px;
+
+    font-weight: 700;
+
+    margin-bottom: 6px;
+
+}
+
+
+.order-subtitle {
+
+    color: #cbd5e1;
+
+    font-size: 13px;
+
+    margin-bottom: 15px;
+
+}
+
+
+/* =====================================================
+   ORDER FORM CARD
+   ===================================================== */
+
+.order-form-card {
+
+    width: 100%;
+
+    padding: 22px;
+
+    margin-top: 12px;
+    margin-bottom: 25px;
+
+    background:
+        rgba(255, 255, 255, 0.07);
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+
+    border-radius: 22px;
+
+    box-sizing: border-box;
+
+}
+
+
+/* =====================================================
+   ORDER SUCCESS
+   ===================================================== */
+
+.order-success {
+
+    width: 100%;
+
+    padding: 22px;
+
+    margin-top: 15px;
+    margin-bottom: 25px;
+
+    background:
+        rgba(34, 197, 94, 0.10);
+
+    border:
+        1px solid
+        rgba(34, 197, 94, 0.25);
+
+    border-radius: 22px;
+
+    box-sizing: border-box;
+
+}
+
+
+.order-success-title {
+
+    color: #bbf7d0;
+
+    font-size: 20px;
+
+    font-weight: 800;
+
+    margin-bottom: 12px;
+
+}
+
+
+.order-success-text {
+
+    color: #e2e8f0;
+
+    font-size: 14px;
+
+    line-height: 1.7;
+
+}
+
+
+/* =====================================================
+   BUTTON
+   ===================================================== */
+
+div.stButton > button {
+
+    border-radius: 14px !important;
+
+    font-weight: 700 !important;
+
+    min-height: 48px !important;
+
+}
+
+
+/* =====================================================
    CHAT TITLE
    ===================================================== */
 
@@ -741,6 +897,24 @@ div[data-testid="stChatInput"] textarea::placeholder {
     }
 
 
+    .order-card {
+
+        padding: 17px;
+
+        border-radius: 18px;
+
+    }
+
+
+    .order-form-card {
+
+        padding: 17px;
+
+        border-radius: 18px;
+
+    }
+
+
     .chat-title {
 
         font-size: 16px;
@@ -879,17 +1053,6 @@ st.html("""
 
 
 # =========================================================
-# CHAT TITLE
-# =========================================================
-
-st.html("""
-<div class="chat-title">
-    💬 Chat dengan Mika
-</div>
-""")
-
-
-# =========================================================
 # SESSION STATE
 # =========================================================
 
@@ -924,18 +1087,37 @@ if "complaint_text" not in st.session_state:
 
 
 # =========================================================
-# DISPLAY CHAT HISTORY
+# ORDER SESSION STATE
 # =========================================================
 
-for message in st.session_state.messages:
+if "show_order_form" not in st.session_state:
 
-    with st.chat_message(
-        message["role"]
-    ):
+    st.session_state.show_order_form = False
 
-        st.write(
-            message["content"]
-        )
+
+if "last_order_id" not in st.session_state:
+
+    st.session_state.last_order_id = None
+
+
+if "last_order_name" not in st.session_state:
+
+    st.session_state.last_order_name = ""
+
+
+if "last_order_phone" not in st.session_state:
+
+    st.session_state.last_order_phone = ""
+
+
+if "last_order_items" not in st.session_state:
+
+    st.session_state.last_order_items = 0
+
+
+if "last_order_total" not in st.session_state:
+
+    st.session_state.last_order_total = 0
 
 
 # =========================================================
@@ -996,6 +1178,392 @@ def extract_phone_number(text):
 
 
 # =========================================================
+# ORDER BUTTON
+# =========================================================
+
+st.html("""
+<div class="order-card">
+
+    <div class="order-title">
+        🛒 Mau pesan Kays Kitchen?
+    </div>
+
+    <div class="order-subtitle">
+        Pesan langsung melalui sistem order Mika.
+    </div>
+
+</div>
+""")
+
+
+if st.button(
+    "🛒 ORDER SEKARANG",
+    use_container_width=True
+):
+
+    st.session_state.show_order_form = True
+
+    st.session_state.last_order_id = None
+
+
+# =========================================================
+# ORDER FORM
+# =========================================================
+
+if st.session_state.show_order_form:
+
+    st.html("""
+    <div class="order-form-card">
+
+        <div class="order-title">
+            🛒 Buat Pesanan
+        </div>
+
+        <div class="order-subtitle">
+            Silakan isi data pesanan kakak.
+        </div>
+
+    </div>
+    """)
+
+
+    with st.form("order_form"):
+
+        # -------------------------------------------------
+        # CUSTOMER
+        # -------------------------------------------------
+
+        customer_name = st.text_input(
+            "👤 Nama",
+            placeholder="Nama kakak"
+        )
+
+
+        customer_whatsapp = st.text_input(
+            "📱 WhatsApp",
+            placeholder="081234567890"
+        )
+
+
+        st.markdown(
+            "#### 🍚 Pilihan Ricebowl"
+        )
+
+
+        # -------------------------------------------------
+        # MENU
+        # -------------------------------------------------
+
+        sambal_matah_qty = st.number_input(
+            "🌶️ Sambal Matah — Rp18.000",
+            min_value=0,
+            max_value=100,
+            value=0,
+            step=1
+        )
+
+
+        sambal_bawang_qty = st.number_input(
+            "🧅 Sambal Bawang — Rp18.000",
+            min_value=0,
+            max_value=100,
+            value=0,
+            step=1
+        )
+
+
+        # -------------------------------------------------
+        # TOTAL
+        # -------------------------------------------------
+
+        total_items = (
+            sambal_matah_qty
+            +
+            sambal_bawang_qty
+        )
+
+
+        total_price = (
+            total_items
+            *
+            18000
+        )
+
+
+        formatted_total = (
+            f"Rp{total_price:,}"
+            .replace(",", ".")
+        )
+
+
+        st.markdown(
+            f"""
+            **Total Pesanan:** {total_items} ricebowl
+
+            **Total Harga:** {formatted_total}
+            """
+        )
+
+
+        # -------------------------------------------------
+        # NOTES
+        # -------------------------------------------------
+
+        notes = st.text_area(
+            "📝 Catatan",
+            placeholder=(
+                "Contoh: sambal dipisah, "
+                "atau catatan lainnya."
+            )
+        )
+
+
+        # -------------------------------------------------
+        # SUBMIT
+        # -------------------------------------------------
+
+        submitted = st.form_submit_button(
+            "✅ KIRIM PESANAN",
+            use_container_width=True
+        )
+
+
+        if submitted:
+
+            # =============================================
+            # VALIDASI NAMA
+            # =============================================
+
+            if not customer_name.strip():
+
+                st.error(
+                    "Nama belum diisi ya kak."
+                )
+
+                st.stop()
+
+
+            # =============================================
+            # VALIDASI WHATSAPP
+            # =============================================
+
+            phone = extract_phone_number(
+                customer_whatsapp
+            )
+
+
+            if not phone:
+
+                st.error(
+                    "Nomor WhatsApp belum valid. "
+                    "Contoh: 081234567890"
+                )
+
+                st.stop()
+
+
+            # =============================================
+            # VALIDASI MENU
+            # =============================================
+
+            if total_items <= 0:
+
+                st.error(
+                    "Silakan pilih minimal 1 ricebowl."
+                )
+
+                st.stop()
+
+
+            # =============================================
+            # SAVE ORDER
+            # =============================================
+
+            try:
+
+                order_id = save_order(
+
+                    customer_name=
+                        customer_name.strip(),
+
+                    customer_whatsapp=
+                        phone,
+
+                    sambal_matah_qty=
+                        sambal_matah_qty,
+
+                    sambal_bawang_qty=
+                        sambal_bawang_qty,
+
+                    notes=
+                        notes.strip()
+
+                )
+
+
+                # -----------------------------------------
+                # SIMPAN HASIL ORDER
+                # -----------------------------------------
+
+                st.session_state.last_order_id = (
+                    order_id
+                )
+
+
+                st.session_state.last_order_name = (
+                    customer_name.strip()
+                )
+
+
+                st.session_state.last_order_phone = (
+                    phone
+                )
+
+
+                st.session_state.last_order_items = (
+                    total_items
+                )
+
+
+                st.session_state.last_order_total = (
+                    total_price
+                )
+
+
+                # -----------------------------------------
+                # TUTUP FORM
+                # -----------------------------------------
+
+                st.session_state.show_order_form = False
+
+
+                # -----------------------------------------
+                # RERUN
+                # -----------------------------------------
+
+                st.rerun()
+
+
+            except Exception as e:
+
+                print(
+                    "ERROR SAVE ORDER:",
+                    repr(e)
+                )
+
+
+                st.error(
+                    "Maaf kak, pesanan belum berhasil "
+                    "disimpan. Silakan coba lagi."
+                )
+
+
+# =========================================================
+# ORDER SUCCESS
+# =========================================================
+
+if st.session_state.last_order_id is not None:
+
+    order_total = (
+        f"Rp{st.session_state.last_order_total:,}"
+        .replace(",", ".")
+    )
+
+
+    st.html(
+        f"""
+        <div class="order-success">
+
+            <div class="order-success-title">
+                🎉 Pesanan Berhasil Dibuat!
+            </div>
+
+            <div class="order-success-text">
+
+                <strong>
+                    Nomor Order #{st.session_state.last_order_id}
+                </strong>
+
+                <br><br>
+
+                👤 Nama:
+                {st.session_state.last_order_name}
+
+                <br>
+
+                📱 WhatsApp:
+                {st.session_state.last_order_phone}
+
+                <br>
+
+                🍚 Total:
+                {st.session_state.last_order_items}
+                ricebowl
+
+                <br>
+
+                💰 Total Harga:
+                {order_total}
+
+                <br><br>
+
+                Pesanan kakak sudah masuk ke sistem
+                Kays Kitchen dan akan diproses oleh Admin.
+
+            </div>
+
+        </div>
+        """
+    )
+
+
+    if st.button(
+        "🛒 Buat Pesanan Baru",
+        use_container_width=True
+    ):
+
+        st.session_state.last_order_id = None
+
+        st.session_state.last_order_name = ""
+
+        st.session_state.last_order_phone = ""
+
+        st.session_state.last_order_items = 0
+
+        st.session_state.last_order_total = 0
+
+        st.session_state.show_order_form = True
+
+        st.rerun()
+
+
+# =========================================================
+# CHAT TITLE
+# =========================================================
+
+st.html("""
+<div class="chat-title">
+    💬 Chat dengan Mika
+</div>
+""")
+
+
+# =========================================================
+# DISPLAY CHAT HISTORY
+# =========================================================
+
+for message in st.session_state.messages:
+
+    with st.chat_message(
+        message["role"]
+    ):
+
+        st.write(
+            message["content"]
+        )
+
+
+# =========================================================
 # EXTRACT CUSTOMER NAME
 # =========================================================
 
@@ -1010,7 +1578,7 @@ def extract_customer_name(text):
 
 
     # -----------------------------------------------------
-    # 1. FORMAT:
+    # FORMAT:
     # Nama: Prabowo
     # Nama = Prabowo
     # -----------------------------------------------------
@@ -1025,7 +1593,7 @@ def extract_customer_name(text):
 
 
     # -----------------------------------------------------
-    # 2. FORMAT:
+    # FORMAT:
     # nama saya Prabowo
     # saya Prabowo
     # aku Prabowo
@@ -1081,9 +1649,10 @@ def extract_customer_name(text):
         "sambal",
         "nasi",
         "ayam",
-        "sedikit"
-        "tumpe"
+        "sedikit",
+        "tumpe",
         "tumpeh"
+
     }
 
 
@@ -1136,15 +1705,13 @@ def extract_customer_name(text):
 
             continue
 
-        # -----------------------------------------------------
+
+        # -------------------------------------------------
         # CEGAH KATA KOMPLAIN YANG DIPANJANGKAN
-        # Contoh:
-        # tumpahhhhh → tetap dianggap "tumpah"
-        # kurangg    → tetap dianggap "kurang"
-        # rusakkkk   → tetap dianggap "rusak"
-        # -----------------------------------------------------
+        # -------------------------------------------------
 
         is_forbidden = False
+
 
         for word in words:
 
@@ -1152,20 +1719,27 @@ def extract_customer_name(text):
                 ".,!?;:()[]{}"
             )
 
+
             for forbidden in forbidden_words:
 
                 if (
-                        word_clean == forbidden
-                        or
-                        word_clean.startswith(forbidden)
+                    word_clean == forbidden
+                    or
+                    word_clean.startswith(forbidden)
                 ):
+
                     is_forbidden = True
+
                     break
 
+
             if is_forbidden:
+
                 break
 
+
         if is_forbidden:
+
             continue
 
 
@@ -1248,13 +1822,19 @@ def looks_like_name(text):
         "nasi",
         "ayam",
         "sedikit",
-        "isinya"
+        "isinya",
+        "tumpe",
+        "tumpeh"
+
     }
 
 
     lowered_words = [
+
         word.lower()
+
         for word in words
+
     ]
 
 
@@ -1289,6 +1869,7 @@ def looks_like_name(text):
 
     return True
 
+
 # =========================================================
 # INTENT DETECTION
 # =========================================================
@@ -1296,9 +1877,12 @@ def looks_like_name(text):
 def detect_intent(text):
 
     if not text:
+
         return "general"
 
+
     text_lower = text.lower().strip()
+
 
     # -----------------------------------------------------
     # COMPLAINT
@@ -1314,6 +1898,7 @@ def detect_intent(text):
     # -----------------------------------------------------
 
     menu_keywords = [
+
         "menu",
         "ricebowl",
         "ayam",
@@ -1323,7 +1908,9 @@ def detect_intent(text):
         "harga",
         "berapa",
         "harga berapa"
+
     ]
+
 
     if any(
         keyword in text_lower
@@ -1338,6 +1925,7 @@ def detect_intent(text):
     # -----------------------------------------------------
 
     operational_keywords = [
+
         "buka",
         "tutup",
         "jam buka",
@@ -1353,7 +1941,9 @@ def detect_intent(text):
         "transfer",
         "pembayaran",
         "bayar"
+
     ]
+
 
     if any(
         keyword in text_lower
@@ -1364,10 +1954,37 @@ def detect_intent(text):
 
 
     # -----------------------------------------------------
+    # ORDER INTENT
+    # -----------------------------------------------------
+
+    order_keywords = [
+
+        "mau pesan",
+        "ingin pesan",
+        "mau order",
+        "ingin order",
+        "pesan ricebowl",
+        "order ricebowl",
+        "mau beli",
+        "ingin beli"
+
+    ]
+
+
+    if any(
+        keyword in text_lower
+        for keyword in order_keywords
+    ):
+
+        return "order"
+
+
+    # -----------------------------------------------------
     # DEFAULT
     # -----------------------------------------------------
 
     return "general"
+
 
 # =========================================================
 # COMPLAINT DETECTION
@@ -1376,13 +1993,17 @@ def detect_intent(text):
 def is_complaint_message(text):
 
     if not text:
+
         return False
 
+
     text = text.lower().strip()
+
 
     complaint_keywords = [
 
         # Komplain umum
+
         "komplain",
         "complain",
         "keluhan",
@@ -1391,6 +2012,7 @@ def is_complaint_message(text):
         "kecewain",
 
         # Kondisi makanan
+
         "rusak",
         "tumpah",
         "bocor",
@@ -1398,8 +2020,9 @@ def is_complaint_message(text):
         "kekurangan",
 
         # Porsi
-        "cuma dikit"
-        "cuma sedikit"
+
+        "cuma dikit",
+        "cuma sedikit",
         "isinya sedikit",
         "isi sedikit",
         "porsinya sedikit",
@@ -1408,6 +2031,7 @@ def is_complaint_message(text):
         "makanan sedikit",
 
         # Ketidaksesuaian
+
         "salah",
         "kesalahan",
         "beda",
@@ -1417,31 +2041,37 @@ def is_complaint_message(text):
         "gak sesuai",
 
         # Tidak ada
+
         "tidak ada",
         "ga ada",
         "gak ada",
 
         # Pengiriman
+
         "belum datang",
         "belum sampai",
         "terlambat",
         "telat",
 
         # Masalah
+
         "masalah",
         "kendala",
         "buruk",
         "parah",
 
         # Makanan
+
         "makanan dingin",
         "nasi dingin",
 
         # Pesanan
+
         "pesanan salah",
-        "pesanan kurang",
+        "pesanan kurang"
 
     ]
+
 
     return any(
         keyword in text
@@ -1632,13 +2262,9 @@ def clean_complaint_text(text):
     if complaint.lower() in {
 
         "saya",
-
         "aku",
-
         "nama",
-
         "wa",
-
         "whatsapp"
 
     }:
@@ -1655,11 +2281,19 @@ def clean_complaint_text(text):
 
 def save_current_complaint():
 
-    name = st.session_state.customer_name.strip()
+    name = (
+        st.session_state.customer_name.strip()
+    )
 
-    whatsapp = st.session_state.customer_whatsapp.strip()
 
-    complaint = st.session_state.complaint_text.strip()
+    whatsapp = (
+        st.session_state.customer_whatsapp.strip()
+    )
+
+
+    complaint = (
+        st.session_state.complaint_text.strip()
+    )
 
 
     # -----------------------------------------------------
@@ -1806,7 +2440,13 @@ def process_complete_complaint(prompt):
     # SEMUA LENGKAP
     # =====================================================
 
-    if not missing_name and not missing_whatsapp and not missing_complaint:
+    if (
+        not missing_name
+        and
+        not missing_whatsapp
+        and
+        not missing_complaint
+    ):
 
         try:
 
@@ -1917,15 +2557,29 @@ def process_complete_complaint(prompt):
 def has_complete_complaint_data(text):
 
     if not text:
+
         return False
 
-    name = extract_customer_name(text)
 
-    phone = extract_phone_number(text)
+    name = extract_customer_name(
+        text
+    )
 
-    complaint = clean_complaint_text(text)
 
-    complaint_detected = is_complaint_message(text)
+    phone = extract_phone_number(
+        text
+    )
+
+
+    complaint = clean_complaint_text(
+        text
+    )
+
+
+    complaint_detected = is_complaint_message(
+        text
+    )
+
 
     return (
         bool(name)
@@ -1936,6 +2590,7 @@ def has_complete_complaint_data(text):
         and
         complaint_detected
     )
+
 
 # =========================================================
 # USER INPUT
@@ -2287,29 +2942,51 @@ if prompt:
     # START NEW COMPLAINT
     # =====================================================
 
-    # =====================================================
-
-    # START NEW COMPLAINT
-
-    # =====================================================
-
     elif (
 
-            has_complete_complaint_data(prompt)
+        has_complete_complaint_data(prompt)
 
-            or
+        or
 
-            is_complaint_message(prompt)
+        is_complaint_message(prompt)
 
     ):
 
-        # -------------------------------------------------
-        # PENTING:
-        # Selalu proses pesan lengkap terlebih dahulu.
-        # -------------------------------------------------
-
         answer = process_complete_complaint(
             prompt
+        )
+
+
+    # =====================================================
+    # INTENT DETECTION
+    # =====================================================
+
+    if answer is None:
+
+        intent = detect_intent(
+            prompt
+        )
+
+
+        print(
+            "===================================="
+        )
+
+
+        print(
+            "INTENT DETECTED:",
+            intent
+        )
+
+
+        print(
+            "MESSAGE:",
+            prompt
+        )
+
+
+        print(
+            "===================================="
         )
 
 
@@ -2328,9 +3005,11 @@ if prompt:
 
                 chat_history.append({
 
-                    "role": message["role"],
+                    "role":
+                        message["role"],
 
-                    "content": message["content"]
+                    "content":
+                        message["content"]
 
                 })
 
@@ -2372,7 +3051,9 @@ if prompt:
         "assistant"
     ):
 
-        st.write(answer)
+        st.write(
+            answer
+        )
 
 
     # =====================================================

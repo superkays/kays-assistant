@@ -166,8 +166,6 @@ def decode_key_info(key):
 
         payload = parts[1]
 
-        # Tambahkan padding jika diperlukan
-
         payload += "=" * (
             4 - len(payload) % 4
         )
@@ -325,7 +323,7 @@ def test_supabase_connection():
 def create_database():
 
     # Supabase sudah memiliki database.
-    # Fungsi ini dipertahankan agar app.py lama
+    # Fungsi dipertahankan agar app.py lama
     # tetap kompatibel.
 
     return True
@@ -366,10 +364,6 @@ def save_complaint(
         )
 
 
-        # =================================================
-        # CEK HASIL INSERT
-        # =================================================
-
         if not response.data:
 
             raise RuntimeError(
@@ -377,14 +371,8 @@ def save_complaint(
             )
 
 
-        # response.data adalah LIST
-
         complaint_id = response.data[0]["id"]
 
-
-        # =================================================
-        # LOG
-        # =================================================
 
         print(
             "===================================="
@@ -430,6 +418,253 @@ def save_complaint(
 
         print(
             "ERROR SUPABASE INSERT"
+        )
+
+        print(
+            "TYPE:",
+            type(e).__name__
+        )
+
+        print(
+            "DETAIL:",
+            str(e)
+        )
+
+        print(
+            "===================================="
+        )
+
+        raise
+
+
+# =========================================================
+# SAVE ORDER
+# =========================================================
+
+def save_order(
+    customer_name,
+    customer_whatsapp,
+    sambal_matah_qty,
+    sambal_bawang_qty,
+    notes="",
+    status="Pending"
+):
+
+    # -----------------------------------------------------
+    # NORMALISASI NILAI
+    # -----------------------------------------------------
+
+    customer_name = str(
+        customer_name
+    ).strip()
+
+
+    customer_whatsapp = str(
+        customer_whatsapp
+    ).strip()
+
+
+    notes = str(
+        notes or ""
+    ).strip()
+
+
+    sambal_matah_qty = int(
+        sambal_matah_qty or 0
+    )
+
+
+    sambal_bawang_qty = int(
+        sambal_bawang_qty or 0
+    )
+
+
+    # -----------------------------------------------------
+    # VALIDASI
+    # -----------------------------------------------------
+
+    if not customer_name:
+
+        raise ValueError(
+            "Nama customer belum diisi."
+        )
+
+
+    if not customer_whatsapp:
+
+        raise ValueError(
+            "Nomor WhatsApp customer belum diisi."
+        )
+
+
+    if sambal_matah_qty < 0:
+
+        raise ValueError(
+            "Jumlah Sambal Matah tidak valid."
+        )
+
+
+    if sambal_bawang_qty < 0:
+
+        raise ValueError(
+            "Jumlah Sambal Bawang tidak valid."
+        )
+
+
+    # -----------------------------------------------------
+    # TOTAL ITEM
+    # -----------------------------------------------------
+
+    total_items = (
+        sambal_matah_qty
+        +
+        sambal_bawang_qty
+    )
+
+
+    if total_items <= 0:
+
+        raise ValueError(
+            "Minimal pesan 1 ricebowl."
+        )
+
+
+    # -----------------------------------------------------
+    # HARGA
+    # -----------------------------------------------------
+
+    PRICE_PER_BOWL = 18000
+
+
+    total_price = (
+        total_items
+        *
+        PRICE_PER_BOWL
+    )
+
+
+    # -----------------------------------------------------
+    # INSERT SUPABASE
+    # -----------------------------------------------------
+
+    try:
+
+        response = (
+            supabase
+            .table("orders")
+            .insert({
+
+                "customer_name":
+                    customer_name,
+
+                "customer_whatsapp":
+                    customer_whatsapp,
+
+                "sambal_matah_qty":
+                    sambal_matah_qty,
+
+                "sambal_bawang_qty":
+                    sambal_bawang_qty,
+
+                "total_items":
+                    total_items,
+
+                "total_price":
+                    total_price,
+
+                "notes":
+                    notes,
+
+                "status":
+                    status
+
+            })
+            .execute()
+        )
+
+
+        # -------------------------------------------------
+        # VALIDASI RESPONSE
+        # -------------------------------------------------
+
+        if not response.data:
+
+            raise RuntimeError(
+                "Supabase tidak mengembalikan data order."
+            )
+
+
+        order_id = response.data[0]["id"]
+
+
+        # -------------------------------------------------
+        # LOG
+        # -------------------------------------------------
+
+        print(
+            "===================================="
+        )
+
+        print(
+            "ORDER BERHASIL DISIMPAN"
+        )
+
+        print(
+            "ORDER ID:",
+            order_id
+        )
+
+        print(
+            "NAMA:",
+            customer_name
+        )
+
+        print(
+            "WHATSAPP:",
+            customer_whatsapp
+        )
+
+        print(
+            "MATAH:",
+            sambal_matah_qty
+        )
+
+        print(
+            "BAWANG:",
+            sambal_bawang_qty
+        )
+
+        print(
+            "TOTAL ITEM:",
+            total_items
+        )
+
+        print(
+            "TOTAL HARGA:",
+            total_price
+        )
+
+        print(
+            "STATUS:",
+            status
+        )
+
+        print(
+            "===================================="
+        )
+
+
+        return order_id
+
+
+    except Exception as e:
+
+        print(
+            "===================================="
+        )
+
+        print(
+            "ERROR SUPABASE INSERT ORDER"
         )
 
         print(
@@ -533,6 +768,211 @@ def get_complaints():
 
 
 # =========================================================
+# GET ALL ORDERS
+# =========================================================
+
+def get_orders():
+
+    # -----------------------------------------------------
+    # HANYA ADMIN CLIENT
+    # -----------------------------------------------------
+
+    if admin_supabase is None:
+
+        raise RuntimeError(
+            "SUPABASE_SERVICE_ROLE_KEY "
+            "belum dikonfigurasi."
+        )
+
+
+    try:
+
+        response = (
+            admin_supabase
+            .table("orders")
+            .select(
+                "id, created_at, customer_name, "
+                "customer_whatsapp, "
+                "sambal_matah_qty, "
+                "sambal_bawang_qty, "
+                "total_items, "
+                "total_price, "
+                "notes, "
+                "status"
+            )
+            .order(
+                "id",
+                desc=True
+            )
+            .execute()
+        )
+
+
+        orders = []
+
+
+        for row in response.data:
+
+            orders.append({
+
+                "id":
+                    row.get("id"),
+
+                "created_at":
+                    row.get("created_at"),
+
+                "customer_name":
+                    row.get("customer_name"),
+
+                "customer_whatsapp":
+                    row.get("customer_whatsapp"),
+
+                "sambal_matah_qty":
+                    row.get("sambal_matah_qty"),
+
+                "sambal_bawang_qty":
+                    row.get("sambal_bawang_qty"),
+
+                "total_items":
+                    row.get("total_items"),
+
+                "total_price":
+                    row.get("total_price"),
+
+                "notes":
+                    row.get("notes"),
+
+                "status":
+                    row.get("status")
+
+            })
+
+
+        return orders
+
+
+    except Exception as e:
+
+        print(
+            "===================================="
+        )
+
+        print(
+            "ERROR GET ORDERS"
+        )
+
+        print(
+            "TYPE:",
+            type(e).__name__
+        )
+
+        print(
+            "DETAIL:",
+            str(e)
+        )
+
+        print(
+            "===================================="
+        )
+
+        raise
+
+
+# =========================================================
+# UPDATE ORDER STATUS
+# =========================================================
+
+def update_order_status(
+    order_id,
+    new_status
+):
+
+    # -----------------------------------------------------
+    # HANYA ADMIN CLIENT
+    # -----------------------------------------------------
+
+    if admin_supabase is None:
+
+        raise RuntimeError(
+            "SUPABASE_SERVICE_ROLE_KEY "
+            "belum dikonfigurasi."
+        )
+
+
+    # -----------------------------------------------------
+    # STATUS YANG DIPERBOLEHKAN
+    # -----------------------------------------------------
+
+    allowed_statuses = {
+
+        "Pending",
+
+        "Diproses",
+
+        "Selesai",
+
+        "Dibatalkan"
+
+    }
+
+
+    if new_status not in allowed_statuses:
+
+        raise ValueError(
+            "Status order tidak valid."
+        )
+
+
+    try:
+
+        response = (
+            admin_supabase
+            .table("orders")
+            .update({
+
+                "status":
+                    new_status
+
+            })
+            .eq(
+                "id",
+                order_id
+            )
+            .execute()
+        )
+
+
+        return response.data
+
+
+    except Exception as e:
+
+        print(
+            "===================================="
+        )
+
+        print(
+            "ERROR UPDATE ORDER"
+        )
+
+        print(
+            "TYPE:",
+            type(e).__name__
+        )
+
+        print(
+            "DETAIL:",
+            str(e)
+        )
+
+        print(
+            "===================================="
+        )
+
+        raise
+
+
+# =========================================================
 # UPDATE COMPLAINT STATUS
 # =========================================================
 
@@ -615,26 +1055,53 @@ def test_public_insert():
             supabase
             .table("complaints")
             .insert({
-                "customer_name": "TEST USER",
-                "customer_whatsapp": "080000000000",
-                "complaint_text": "TEST RLS PUBLIC INSERT",
-                "status": "Pending"
+
+                "customer_name":
+                    "TEST USER",
+
+                "customer_whatsapp":
+                    "080000000000",
+
+                "complaint_text":
+                    "TEST RLS PUBLIC INSERT",
+
+                "status":
+                    "Pending"
+
             })
             .execute()
         )
 
-        print("PUBLIC INSERT BERHASIL")
-        print("DATA:", response.data)
+        print(
+            "PUBLIC INSERT BERHASIL"
+        )
+
+        print(
+            "DATA:",
+            response.data
+        )
 
         return True
 
+
     except Exception as e:
 
-        print("PUBLIC INSERT GAGAL")
-        print("TYPE:", type(e).__name__)
-        print("DETAIL:", str(e))
+        print(
+            "PUBLIC INSERT GAGAL"
+        )
+
+        print(
+            "TYPE:",
+            type(e).__name__
+        )
+
+        print(
+            "DETAIL:",
+            str(e)
+        )
 
         return False
+
 
 # =========================================================
 # TEST PUBLIC INSERT VIA POSTGREST
@@ -649,14 +1116,17 @@ def test_public_insert_postgrest():
     print("TEST DIRECT POSTGREST")
     print("====================================")
 
+
     url = (
         SUPABASE_URL
         + "/rest/v1/complaints"
     )
 
+
     headers = {
 
-        "apikey": SUPABASE_KEY,
+        "apikey":
+            SUPABASE_KEY,
 
         "Authorization":
             f"Bearer {SUPABASE_KEY}",
@@ -668,6 +1138,7 @@ def test_public_insert_postgrest():
             "return=representation"
 
     }
+
 
     payload = {
 
@@ -685,6 +1156,7 @@ def test_public_insert_postgrest():
 
     }
 
+
     try:
 
         response = requests.post(
@@ -699,15 +1171,18 @@ def test_public_insert_postgrest():
 
         )
 
+
         print(
             "HTTP STATUS:",
             response.status_code
         )
 
+
         print(
             "RESPONSE:",
             response.text
         )
+
 
     except Exception as e:
 
@@ -715,10 +1190,12 @@ def test_public_insert_postgrest():
             "DIRECT POSTGREST GAGAL"
         )
 
+
         print(
             "TYPE:",
             type(e).__name__
         )
+
 
         print(
             "DETAIL:",
@@ -737,12 +1214,19 @@ def test_secret_insert():
     print("TEST SECRET INSERT")
     print("====================================")
 
+
     if admin_supabase is None:
 
-        print("SECRET INSERT GAGAL")
-        print("SUPABASE_SERVICE_ROLE_KEY tidak tersedia.")
+        print(
+            "SECRET INSERT GAGAL"
+        )
+
+        print(
+            "SUPABASE_SERVICE_ROLE_KEY tidak tersedia."
+        )
 
         return False
+
 
     try:
 
@@ -750,26 +1234,63 @@ def test_secret_insert():
             admin_supabase
             .table("complaints")
             .insert({
-                "customer_name": "TEST SECRET",
-                "customer_whatsapp": "080000000002",
-                "complaint_text": "TEST SECRET INSERT",
-                "status": "Pending"
+
+                "customer_name":
+                    "TEST SECRET",
+
+                "customer_whatsapp":
+                    "080000000002",
+
+                "complaint_text":
+                    "TEST SECRET INSERT",
+
+                "status":
+                    "Pending"
+
             })
             .execute()
         )
 
-        print("SECRET INSERT BERHASIL")
-        print("DATA:", response.data)
+
+        print(
+            "SECRET INSERT BERHASIL"
+        )
+
+
+        print(
+            "DATA:",
+            response.data
+        )
+
 
         return True
 
+
     except Exception as e:
 
-        print("SECRET INSERT GAGAL")
-        print("TYPE:", type(e).__name__)
-        print("DETAIL:", str(e))
+        print(
+            "SECRET INSERT GAGAL"
+        )
+
+
+        print(
+            "TYPE:",
+            type(e).__name__
+        )
+
+
+        print(
+            "DETAIL:",
+            str(e)
+        )
+
 
         return False
+
+
+# =========================================================
+# TEST KEY IDENTITY
+# =========================================================
 
 def test_key_identity():
 
@@ -778,12 +1299,14 @@ def test_key_identity():
     print("TEST KEY IDENTITY")
     print("====================================")
 
+
     print(
         "SUPABASE KEY PREFIX:",
         SUPABASE_KEY[:20]
         if SUPABASE_KEY
         else "NONE"
     )
+
 
     print(
         "SUPABASE KEY LENGTH:",
@@ -792,12 +1315,14 @@ def test_key_identity():
         else 0
     )
 
+
     print(
         "SERVICE KEY PREFIX:",
         SUPABASE_SERVICE_ROLE_KEY[:20]
         if SUPABASE_SERVICE_ROLE_KEY
         else "NONE"
     )
+
 
     print(
         "SERVICE KEY LENGTH:",
@@ -806,13 +1331,21 @@ def test_key_identity():
         else 0
     )
 
+
     print(
         "SUPABASE URL:",
         SUPABASE_URL
     )
 
-    print("====================================")
 
+    print(
+        "===================================="
+    )
+
+
+# =========================================================
+# TEST LEGACY ANON INSERT
+# =========================================================
 
 def test_legacy_anon_insert():
 
@@ -823,9 +1356,11 @@ def test_legacy_anon_insert():
     print("TEST LEGACY ANON KEY")
     print("====================================")
 
+
     legacy_key = os.getenv(
         "SUPABASE_LEGACY_ANON_KEY"
     )
+
 
     if not legacy_key:
 
@@ -835,14 +1370,17 @@ def test_legacy_anon_insert():
 
         return
 
+
     url = (
         SUPABASE_URL
         + "/rest/v1/complaints"
     )
 
+
     headers = {
 
-        "apikey": legacy_key,
+        "apikey":
+            legacy_key,
 
         "Authorization":
             f"Bearer {legacy_key}",
@@ -852,7 +1390,9 @@ def test_legacy_anon_insert():
 
         "Prefer":
             "return=representation"
+
     }
+
 
     payload = {
 
@@ -867,7 +1407,9 @@ def test_legacy_anon_insert():
 
         "status":
             "Pending"
+
     }
+
 
     try:
 
@@ -880,17 +1422,21 @@ def test_legacy_anon_insert():
             json=payload,
 
             timeout=15
+
         )
+
 
         print(
             "HTTP STATUS:",
             response.status_code
         )
 
+
         print(
             "RESPONSE:",
             response.text
         )
+
 
     except Exception as e:
 
@@ -898,15 +1444,18 @@ def test_legacy_anon_insert():
             "LEGACY ANON GAGAL"
         )
 
+
         print(
             "TYPE:",
             type(e).__name__
         )
 
+
         print(
             "DETAIL:",
             str(e)
         )
+
 
 # =========================================================
 # TEST
@@ -918,48 +1467,27 @@ if __name__ == "__main__":
         "Supabase database module aktif."
     )
 
+
     test_supabase_connection()
 
-    test_public_insert()
-
-    test_public_insert_postgrest()
-
-    test_legacy_anon_insert()
 
     print("")
-    print("====================================")
-    print("TEST SAVE_COMPLAINT")
-    print("====================================")
+    print(
+        "===================================="
+    )
 
-    try:
+    print(
+        "DATABASE MODULE READY"
+    )
 
-        result = save_complaint(
-            "TEST SAVE FUNCTION",
-            "080000000010",
-            "TEST DARI FUNGSI SAVE_COMPLAINT"
-        )
+    print(
+        "Complaint system : ACTIVE"
+    )
 
-        print(
-            "SAVE_COMPLAINT BERHASIL"
-        )
+    print(
+        "Order system     : ACTIVE"
+    )
 
-        print(
-            "ID:",
-            result
-        )
-
-    except Exception as e:
-
-        print(
-            "SAVE_COMPLAINT GAGAL"
-        )
-
-        print(
-            "TYPE:",
-            type(e).__name__
-        )
-
-        print(
-            "DETAIL:",
-            str(e)
-        )
+    print(
+        "===================================="
+    )
