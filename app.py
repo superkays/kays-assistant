@@ -3,8 +3,6 @@ from dotenv import load_dotenv
 import os
 import re
 
-load_dotenv()
-
 from openai import OpenAI
 
 from database import (
@@ -40,7 +38,7 @@ load_dotenv()
 
 
 # =========================================================
-# LOAD OPENAI API KEY
+# OPENAI API KEY
 # =========================================================
 
 api_key = None
@@ -56,7 +54,7 @@ except Exception:
     pass
 
 
-# Prioritas 2: .env / environment variable
+# Prioritas 2: .env / environment
 if not api_key:
 
     api_key = os.getenv(
@@ -190,19 +188,8 @@ Mika TIDAK menghitung harga pesanan.
 
 Mika TIDAK menyimpan data pesanan.
 
-Jika customer mengatakan:
-
-"saya mau pesan"
-
-atau:
-
-"mau order"
-
-atau:
-
-"saya mau beli"
-
-jawab dengan sopan bahwa Mika adalah Customer Service
+Jika customer mengatakan ingin memesan,
+jelaskan bahwa Mika adalah Customer Service
 dan tidak memproses pesanan.
 
 
@@ -265,6 +252,8 @@ JANGAN pernah menganggap kata-kata seperti:
 - terlambat
 - kendala
 - masalah
+- sedikit
+- isinya sedikit
 
 sebagai nama customer.
 
@@ -278,16 +267,18 @@ SETELAH KOMPLAIN TERCATAT
 
 Beritahu customer:
 
-"Komplain kakak sudah berhasil saya catat dan akan
-disampaikan kepada Admin Kays Kitchen untuk
-ditindaklanjuti.
+"Komplain kakak sudah berhasil saya catat dengan
+nomor laporan #ID.
+
+Komplain akan disampaikan kepada Admin Kays Kitchen
+untuk ditindaklanjuti.
 
 Admin akan menghubungi kakak melalui WhatsApp yang
 sudah diberikan."
 
+Nomor laporan HARUS berasal dari sistem database.
 
-Jangan mengatakan Admin sudah menghubungi customer
-sebelum benar-benar dilakukan.
+Jangan mengarang nomor laporan.
 
 
 =========================================================
@@ -907,10 +898,6 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-# ---------------------------------------------------------
-# COMPLAINT STATE
-# ---------------------------------------------------------
-
 if "complaint_active" not in st.session_state:
 
     st.session_state.complaint_active = False
@@ -921,10 +908,6 @@ if "complaint_step" not in st.session_state:
     st.session_state.complaint_step = None
 
 
-# ---------------------------------------------------------
-# CUSTOMER PROFILE
-# ---------------------------------------------------------
-
 if "customer_name" not in st.session_state:
 
     st.session_state.customer_name = ""
@@ -934,10 +917,6 @@ if "customer_whatsapp" not in st.session_state:
 
     st.session_state.customer_whatsapp = ""
 
-
-# ---------------------------------------------------------
-# CURRENT COMPLAINT
-# ---------------------------------------------------------
 
 if "complaint_text" not in st.session_state:
 
@@ -960,68 +939,99 @@ for message in st.session_state.messages:
 
 
 # =========================================================
-# PHONE NUMBER VALIDATION
+# PHONE NUMBER
 # =========================================================
 
 def extract_phone_number(text):
 
-    match = re.search(
-        r"(?:\+62|62|0)[\s\-()]?\d[\d\s\-()]{7,15}",
-        text
-    )
-
-    if not match:
+    if not text:
 
         return None
 
 
-    phone = match.group(0)
+    patterns = [
+
+        r"(?:\+62|62)[\s\-()]?\d[\d\s\-()]{7,15}",
+
+        r"0\d[\d\s\-()]{8,14}"
+
+    ]
 
 
-    # Hapus karakter selain angka
-    phone = re.sub(
-        r"\D",
-        "",
-        phone
-    )
+    for pattern in patterns:
+
+        match = re.search(
+            pattern,
+            text
+        )
 
 
-    # Normalisasi +62 / 62 menjadi 0
-    if phone.startswith("62"):
+        if not match:
 
-        phone = "0" + phone[2:]
+            continue
 
 
-    # Validasi nomor Indonesia sederhana
-    if (
-        phone.startswith("08")
-        and
-        10 <= len(phone) <= 14
-    ):
+        phone = re.sub(
+            r"\D",
+            "",
+            match.group(0)
+        )
 
-        return phone
+
+        if phone.startswith("62"):
+
+            phone = "0" + phone[2:]
+
+
+        if (
+            phone.startswith("08")
+            and
+            10 <= len(phone) <= 14
+        ):
+
+            return phone
 
 
     return None
 
 
 # =========================================================
-# EXTRACT NAME
+# EXTRACT CUSTOMER NAME
 # =========================================================
 
 def extract_customer_name(text):
+
+    if not text:
+
+        return None
+
 
     text_clean = text.strip()
 
 
     # -----------------------------------------------------
-    # Pola:
-    # "saya Budi"
-    # "nama saya Budi"
-    # "aku Budi"
+    # 1. FORMAT:
+    # Nama: Prabowo
+    # Nama = Prabowo
     # -----------------------------------------------------
 
-    patterns = [
+    labeled_patterns = [
+
+        r"\bnama\s*[:=]\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40})",
+
+        r"\bnama\s+kakak\s*[:=]?\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40})"
+
+    ]
+
+
+    # -----------------------------------------------------
+    # 2. FORMAT:
+    # nama saya Prabowo
+    # saya Prabowo
+    # aku Prabowo
+    # -----------------------------------------------------
+
+    normal_patterns = [
 
         r"\bnama saya\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40})",
 
@@ -1032,11 +1042,14 @@ def extract_customer_name(text):
     ]
 
 
-    # -----------------------------------------------------
-    # Kata yang TIDAK BOLEH dianggap nama
-    # -----------------------------------------------------
+    all_patterns = (
+        labeled_patterns
+        +
+        normal_patterns
+    )
 
-    forbidden_words = [
+
+    forbidden_words = {
 
         "mau",
         "ingin",
@@ -1047,17 +1060,17 @@ def extract_customer_name(text):
         "makan",
         "makanan",
         "minum",
+        "komplain",
+        "complain",
+        "keluhan",
+        "kendala",
+        "masalah",
         "tumpah",
         "kurang",
         "kekurangan",
         "rusak",
         "bocor",
         "salah",
-        "komplain",
-        "complain",
-        "keluhan",
-        "kendala",
-        "masalah",
         "telat",
         "terlambat",
         "tidak",
@@ -1067,11 +1080,12 @@ def extract_customer_name(text):
         "ada",
         "sambal",
         "nasi",
-        "ayam"
-    ]
+        "ayam",
+        "sedikit"
+    }
 
 
-    for pattern in patterns:
+    for pattern in all_patterns:
 
         match = re.search(
             pattern,
@@ -1079,45 +1093,65 @@ def extract_customer_name(text):
             re.IGNORECASE
         )
 
-        if match:
 
-            candidate = match.group(1).strip()
+        if not match:
 
-
-            # Hapus bagian setelah koma
-            candidate = candidate.split(",")[0].strip()
+            continue
 
 
-            # Hapus bagian setelah nomor WA
-            candidate = re.split(
-                r"\b(?:no|nomor|wa|whatsapp)\b",
-                candidate,
-                flags=re.IGNORECASE
-            )[0].strip()
+        candidate = match.group(1).strip()
 
 
-            words = candidate.split()
+        # -------------------------------------------------
+        # Berhenti di label berikutnya
+        # -------------------------------------------------
+
+        candidate = re.split(
+            r"\b(?:wa|whatsapp|nomor|no|pesanan|keluhan|komplain)\b",
+            candidate,
+            maxsplit=1,
+            flags=re.IGNORECASE
+        )[0].strip()
 
 
-            if not words:
-                continue
+        candidate = candidate.split(",")[0].strip()
 
 
-            # Jangan terlalu panjang
-            if len(words) > 4:
-                continue
+        words = candidate.split()
 
 
-            # Jika salah satu kata merupakan kata komplain,
-            # jangan dianggap sebagai nama
-            if any(
-                word.lower() in forbidden_words
-                for word in words
-            ):
-                continue
+        if not words:
+
+            continue
 
 
-            return candidate
+        if len(words) > 4:
+
+            continue
+
+
+        if len(candidate) > 50:
+
+            continue
+
+
+        if any(
+            word.lower() in forbidden_words
+            for word in words
+        ):
+
+            continue
+
+
+        if re.search(
+            r"\d",
+            candidate
+        ):
+
+            continue
+
+
+        return candidate
 
 
     return None
@@ -1129,19 +1163,20 @@ def extract_customer_name(text):
 
 def looks_like_name(text):
 
-    value = text.strip()
-
-
-    if not value:
+    if not text:
 
         return False
 
 
-    # -----------------------------------------------------
-    # Maksimal 4 kata
-    # -----------------------------------------------------
+    value = text.strip()
+
 
     words = value.split()
+
+
+    if not words:
+
+        return False
 
 
     if len(words) > 4:
@@ -1149,20 +1184,12 @@ def looks_like_name(text):
         return False
 
 
-    # -----------------------------------------------------
-    # Jangan menerima kalimat panjang sebagai nama
-    # -----------------------------------------------------
-
     if len(value) > 50:
 
         return False
 
 
-    # -----------------------------------------------------
-    # Kata-kata yang jelas bukan nama
-    # -----------------------------------------------------
-
-    forbidden_words = [
+    forbidden_words = {
 
         "mau",
         "ingin",
@@ -1194,34 +1221,29 @@ def looks_like_name(text):
         "sambal",
         "nasi",
         "ayam",
-        "pesanannya",
-        "pesanan saya",
-        "makanan saya"
+        "sedikit",
+        "isinya"
+    }
+
+
+    lowered_words = [
+        word.lower()
+        for word in words
     ]
 
 
-    lowered = value.lower()
+    if any(
+        word in forbidden_words
+        for word in lowered_words
+    ):
 
+        return False
 
-    for forbidden in forbidden_words:
-
-        if forbidden in lowered:
-
-            return False
-
-
-    # -----------------------------------------------------
-    # Jika ada nomor WA, bukan nama murni
-    # -----------------------------------------------------
 
     if extract_phone_number(value):
 
         return False
 
-
-    # -----------------------------------------------------
-    # Nama tidak boleh mengandung angka
-    # -----------------------------------------------------
 
     if re.search(
         r"\d",
@@ -1230,10 +1252,6 @@ def looks_like_name(text):
 
         return False
 
-
-    # -----------------------------------------------------
-    # Nama harus berisi huruf
-    # -----------------------------------------------------
 
     if not re.search(
         r"[A-Za-zÀ-ÿ]",
@@ -1252,62 +1270,73 @@ def looks_like_name(text):
 
 def is_complaint_message(text):
 
-    text = text.lower().strip()
+    if not text:
+        return False
 
+    text = text.lower().strip()
 
     complaint_keywords = [
 
+        # Komplain umum
         "komplain",
         "complain",
         "keluhan",
         "mengeluh",
-
         "kecewa",
         "kecewain",
 
+        # Kondisi makanan
         "rusak",
         "tumpah",
         "bocor",
-
         "kurang",
         "kekurangan",
 
+        # Porsi
+        "cuma dikit"
+        "cuma sedikit"
+        "isinya sedikit",
+        "isi sedikit",
+        "porsinya sedikit",
+        "porsi sedikit",
+        "makanannya sedikit",
+        "makanan sedikit",
+
+        # Ketidaksesuaian
         "salah",
         "kesalahan",
-
         "beda",
         "berbeda",
         "tidak sesuai",
         "ga sesuai",
         "gak sesuai",
 
+        # Tidak ada
         "tidak ada",
         "ga ada",
         "gak ada",
 
+        # Pengiriman
         "belum datang",
         "belum sampai",
-
         "terlambat",
         "telat",
 
+        # Masalah
         "masalah",
         "kendala",
-
         "buruk",
         "parah",
 
-        "porsi sedikit",
-        "makanan sedikit",
-
+        # Makanan
         "makanan dingin",
         "nasi dingin",
 
+        # Pesanan
         "pesanan salah",
-        "pesanan kurang"
+        "pesanan kurang",
 
     ]
-
 
     return any(
         keyword in text
@@ -1316,31 +1345,110 @@ def is_complaint_message(text):
 
 
 # =========================================================
+# EXTRACT LABELED COMPLAINT
+# =========================================================
+
+def extract_labeled_complaint(text):
+
+    if not text:
+
+        return None
+
+
+    patterns = [
+
+        r"\bkeluhan\s*[:=]\s*(.+?)(?=\n|$)",
+
+        r"\bkomplain\s*[:=]\s*(.+?)(?=\n|$)",
+
+        r"\bkendala\s*[:=]\s*(.+?)(?=\n|$)"
+
+    ]
+
+
+    for pattern in patterns:
+
+        match = re.search(
+            pattern,
+            text,
+            re.IGNORECASE
+        )
+
+
+        if match:
+
+            complaint = match.group(1).strip()
+
+
+            if complaint:
+
+                return complaint
+
+
+    return None
+
+
+# =========================================================
 # CLEAN COMPLAINT TEXT
 # =========================================================
 
 def clean_complaint_text(text):
 
-    complaint = text.strip()
+    if not text:
+
+        return ""
+
+
+    original = text.strip()
 
 
     # -----------------------------------------------------
-    # Hapus informasi nama
+    # PRIORITAS 1:
+    # Kalau ada "Keluhan:" ambil hanya isinya.
+    # -----------------------------------------------------
+
+    labeled_complaint = extract_labeled_complaint(
+        original
+    )
+
+
+    if labeled_complaint:
+
+        return labeled_complaint.strip(
+            " ,.-:"
+        )
+
+
+    complaint = original
+
+
+    # -----------------------------------------------------
+    # Hapus Nama
     # -----------------------------------------------------
 
     complaint = re.sub(
-        r"\bnama saya\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}",
+
+        r"\bnama\s*[:=]\s*[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}",
+
         "",
+
         complaint,
+
         flags=re.IGNORECASE
+
     )
 
 
     complaint = re.sub(
-        r"\bsaya\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}",
+
+        r"\bnama saya\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ .'-]{1,40}",
+
         "",
+
         complaint,
+
         flags=re.IGNORECASE
+
     )
 
 
@@ -1355,23 +1463,50 @@ def clean_complaint_text(text):
 
     if phone:
 
-        complaint = complaint.replace(
-            phone,
-            ""
+        complaint = re.sub(
+            re.escape(phone),
+            "",
+            complaint
         )
 
 
     # -----------------------------------------------------
-    # Hapus label umum
+    # Hapus label WA
     # -----------------------------------------------------
 
     complaint = re.sub(
-        r"\b(?:no|nomor|wa|whatsapp)\b",
+
+        r"\b(?:no|nomor|wa|whatsapp)\s*[:=]?\s*",
+
         "",
+
         complaint,
+
         flags=re.IGNORECASE
+
     )
 
+
+    # -----------------------------------------------------
+    # Hapus informasi pesanan jika ada label
+    # -----------------------------------------------------
+
+    complaint = re.sub(
+
+        r"\bpesanan\s*[:=]\s*.+?(?=\n|keluhan|komplain|$)",
+
+        "",
+
+        complaint,
+
+        flags=re.IGNORECASE
+
+    )
+
+
+    # -----------------------------------------------------
+    # Hapus spasi berlebih
+    # -----------------------------------------------------
 
     complaint = re.sub(
         r"\s+",
@@ -1385,6 +1520,27 @@ def clean_complaint_text(text):
     )
 
 
+    # -----------------------------------------------------
+    # Kalau hasil masih berupa informasi identitas
+    # -----------------------------------------------------
+
+    if complaint.lower() in {
+
+        "saya",
+
+        "aku",
+
+        "nama",
+
+        "wa",
+
+        "whatsapp"
+
+    }:
+
+        return ""
+
+
     return complaint
 
 
@@ -1394,30 +1550,72 @@ def clean_complaint_text(text):
 
 def save_current_complaint():
 
+    name = st.session_state.customer_name.strip()
+
+    whatsapp = st.session_state.customer_whatsapp.strip()
+
+    complaint = st.session_state.complaint_text.strip()
+
+
+    # -----------------------------------------------------
+    # VALIDASI SEBELUM DATABASE
+    # -----------------------------------------------------
+
+    if not name:
+
+        raise ValueError(
+            "Nama customer belum tersedia."
+        )
+
+
+    if not whatsapp:
+
+        raise ValueError(
+            "Nomor WhatsApp customer belum tersedia."
+        )
+
+
+    if not complaint:
+
+        raise ValueError(
+            "Isi complaint belum tersedia."
+        )
+
+
+    # -----------------------------------------------------
+    # SIMPAN
+    # -----------------------------------------------------
+
     complaint_id = save_complaint(
 
-        st.session_state.customer_name,
+        name,
 
-        st.session_state.customer_whatsapp,
+        whatsapp,
 
-        st.session_state.complaint_text
+        complaint
 
     )
+
+
+    # -----------------------------------------------------
+    # DATABASE HARUS MENGEMBALIKAN ID
+    # -----------------------------------------------------
+
+    if complaint_id is None:
+
+        raise ValueError(
+            "Database tidak mengembalikan nomor laporan."
+        )
 
 
     return complaint_id
 
 
 # =========================================================
-# RESET COMPLAINT PROCESS
+# RESET COMPLAINT
 # =========================================================
 
 def reset_complaint_process():
-
-    # -----------------------------------------------------
-    # PENTING:
-    # Nama dan WhatsApp TIDAK dihapus.
-    # -----------------------------------------------------
 
     st.session_state.complaint_active = False
 
@@ -1427,75 +1625,81 @@ def reset_complaint_process():
 
 
 # =========================================================
-# START COMPLAINT FROM COMPLETE MESSAGE
+# COMPLETE COMPLAINT PROCESSOR
 # =========================================================
 
 def process_complete_complaint(prompt):
 
-    phone = extract_phone_number(
+    # -----------------------------------------------------
+    # Ambil semua informasi dari satu pesan
+    # -----------------------------------------------------
+
+    detected_name = extract_customer_name(
         prompt
     )
 
 
-    name = extract_customer_name(
+    detected_phone = extract_phone_number(
         prompt
     )
 
 
-    complaint = clean_complaint_text(
+    detected_complaint = clean_complaint_text(
         prompt
     )
 
 
     # -----------------------------------------------------
-    # Jika nama ditemukan
+    # Simpan yang ditemukan
     # -----------------------------------------------------
 
-    if name:
+    if detected_name:
 
-        st.session_state.customer_name = name
+        st.session_state.customer_name = (
+            detected_name
+        )
+
+
+    if detected_phone:
+
+        st.session_state.customer_whatsapp = (
+            detected_phone
+        )
+
+
+    if (
+        detected_complaint
+        and
+        is_complaint_message(prompt)
+    ):
+
+        st.session_state.complaint_text = (
+            detected_complaint
+        )
 
 
     # -----------------------------------------------------
-    # Jika WA ditemukan
+    # Cek kekurangan
     # -----------------------------------------------------
 
-    if phone:
-
-        st.session_state.customer_whatsapp = phone
-
-
-    # -----------------------------------------------------
-    # Jika complaint terdeteksi
-    # -----------------------------------------------------
-
-    if complaint and is_complaint_message(prompt):
-
-        st.session_state.complaint_text = complaint
-
-
-    # -----------------------------------------------------
-    # Tentukan data yang masih kurang
-    # -----------------------------------------------------
-
-    missing_name = (
-        not st.session_state.customer_name
+    missing_name = not bool(
+        st.session_state.customer_name
     )
 
 
-    missing_whatsapp = (
-        not st.session_state.customer_whatsapp
+    missing_whatsapp = not bool(
+        st.session_state.customer_whatsapp
     )
 
 
-    missing_complaint = (
-        not st.session_state.complaint_text
+    missing_complaint = not bool(
+        st.session_state.complaint_text
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # SEMUA LENGKAP
-    # -----------------------------------------------------
+    # =====================================================
 
     if not missing_name and not missing_whatsapp and not missing_complaint:
 
@@ -1509,38 +1713,36 @@ def process_complete_complaint(prompt):
 
             return (
                 "Baik kak, terima kasih informasinya. 🙏\n\n"
+
                 "Komplain kakak sudah berhasil saya catat "
                 f"dengan nomor laporan **#{complaint_id}**.\n\n"
+
                 "Komplain akan disampaikan kepada Admin "
                 "Kays Kitchen untuk ditindaklanjuti.\n\n"
+
                 "Admin akan menghubungi kakak melalui "
                 "WhatsApp yang sudah diberikan."
             )
 
 
-
         except Exception as e:
 
             print(
-
-                "ERROR SAVE COMPLAINT:",
-
-                e
-
-            )
-
-            answer = (
-
-                "❌ Gagal menyimpan komplain.\n\n"
-
-                f"Error: {str(e)}"
-
+                "ERROR SAVE COMPLETE COMPLAINT:",
+                repr(e)
             )
 
 
-    # -----------------------------------------------------
-    # NAMA BELUM ADA
-    # -----------------------------------------------------
+            return (
+                "Maaf kak, komplain belum berhasil "
+                "disimpan. 😔\n\n"
+                "Silakan coba lagi."
+            )
+
+
+    # =====================================================
+    # NAMA KURANG
+    # =====================================================
 
     if missing_name:
 
@@ -1551,15 +1753,17 @@ def process_complete_complaint(prompt):
 
         return (
             "Mohon maaf ya kak atas kendalanya 🙏\n\n"
+
             "Saya bantu catat komplainnya agar dapat "
             "ditindaklanjuti oleh Admin Kays Kitchen.\n\n"
+
             "Boleh saya tahu nama kakak?"
         )
 
 
-    # -----------------------------------------------------
-    # WHATSAPP BELUM ADA
-    # -----------------------------------------------------
+    # =====================================================
+    # WHATSAPP KURANG
+    # =====================================================
 
     if missing_whatsapp:
 
@@ -1569,16 +1773,18 @@ def process_complete_complaint(prompt):
 
 
         return (
-            f"Baik kak {st.session_state.customer_name}. "
-            "Saya bantu catat komplainnya. 🙏\n\n"
+            f"Terima kasih, kak "
+            f"{st.session_state.customer_name}. 😊\n\n"
+
             "Boleh saya minta nomor WhatsApp kakak "
-            "yang bisa dihubungi Admin?"
+            "yang bisa dihubungi Admin untuk "
+            "menindaklanjuti komplain ini?"
         )
 
 
-    # -----------------------------------------------------
-    # COMPLAINT BELUM ADA
-    # -----------------------------------------------------
+    # =====================================================
+    # COMPLAINT KURANG
+    # =====================================================
 
     if missing_complaint:
 
@@ -1590,6 +1796,7 @@ def process_complete_complaint(prompt):
         return (
             f"Terima kasih, kak "
             f"{st.session_state.customer_name}. 🙏\n\n"
+
             "Sekarang boleh ceritakan secara detail "
             "kendala atau komplain yang kakak alami?"
         )
@@ -1597,6 +1804,33 @@ def process_complete_complaint(prompt):
 
     return None
 
+
+# =========================================================
+# DETECT COMPLETE COMPLAINT
+# =========================================================
+
+def has_complete_complaint_data(text):
+
+    if not text:
+        return False
+
+    name = extract_customer_name(text)
+
+    phone = extract_phone_number(text)
+
+    complaint = clean_complaint_text(text)
+
+    complaint_detected = is_complaint_message(text)
+
+    return (
+        bool(name)
+        and
+        bool(phone)
+        and
+        bool(complaint)
+        and
+        complaint_detected
+    )
 
 # =========================================================
 # USER INPUT
@@ -1640,28 +1874,16 @@ if prompt:
 
     if st.session_state.complaint_active:
 
-
         # =================================================
         # STEP NAME
         # =================================================
 
-        if (
-            st.session_state.complaint_step
-            == "name"
-        ):
-
-            # ------------------------------------------------
-            # Coba cari nama dari kalimat
-            # ------------------------------------------------
+        if st.session_state.complaint_step == "name":
 
             detected_name = extract_customer_name(
                 prompt
             )
 
-
-            # ------------------------------------------------
-            # Jika nama ditemukan
-            # ------------------------------------------------
 
             if detected_name:
 
@@ -1670,10 +1892,6 @@ if prompt:
                 )
 
 
-            # ------------------------------------------------
-            # Jika user hanya memberikan nama
-            # ------------------------------------------------
-
             elif looks_like_name(prompt):
 
                 st.session_state.customer_name = (
@@ -1681,22 +1899,24 @@ if prompt:
                 )
 
 
-            # ------------------------------------------------
-            # Jika ternyata masih isi komplain
-            # ------------------------------------------------
-
             else:
 
-                # --------------------------------------------
-                # PENTING:
-                # Jangan buang komplain awal.
-                # --------------------------------------------
+                # -----------------------------------------
+                # Jangan kehilangan complaint
+                # -----------------------------------------
 
                 if is_complaint_message(prompt):
 
-                    st.session_state.complaint_text = (
-                        clean_complaint_text(prompt)
+                    complaint = clean_complaint_text(
+                        prompt
                     )
+
+
+                    if complaint:
+
+                        st.session_state.complaint_text = (
+                            complaint
+                        )
 
 
                 answer = (
@@ -1707,7 +1927,7 @@ if prompt:
 
 
             # ------------------------------------------------
-            # Kalau nama berhasil ditemukan
+            # Kalau nama berhasil
             # ------------------------------------------------
 
             if (
@@ -1715,10 +1935,6 @@ if prompt:
                 and
                 st.session_state.customer_name
             ):
-
-                # --------------------------------------------
-                # Jika WA juga ada dalam pesan yang sama
-                # --------------------------------------------
 
                 phone = extract_phone_number(
                     prompt
@@ -1731,10 +1947,6 @@ if prompt:
                         phone
                     )
 
-
-                # --------------------------------------------
-                # Kalau complaint juga ada
-                # --------------------------------------------
 
                 if is_complaint_message(prompt):
 
@@ -1751,40 +1963,14 @@ if prompt:
 
 
                 # --------------------------------------------
-                # Tentukan langkah berikutnya
+                # Semua lengkap
                 # --------------------------------------------
 
-                if not st.session_state.customer_whatsapp:
-
-                    st.session_state.complaint_step = (
-                        "whatsapp"
-                    )
-
-
-                    answer = (
-                        f"Terima kasih, kak "
-                        f"{st.session_state.customer_name}. 😊\n\n"
-                        "Boleh saya minta nomor WhatsApp kakak "
-                        "yang bisa dihubungi Admin untuk "
-                        "menindaklanjuti komplain ini?"
-                    )
-
-
-                elif not st.session_state.complaint_text:
-
-                    st.session_state.complaint_step = (
-                        "complaint"
-                    )
-
-
-                    answer = (
-                        "Terima kasih, kak. 🙏\n\n"
-                        "Sekarang boleh ceritakan secara detail "
-                        "kendala atau komplain yang kakak alami?"
-                    )
-
-
-                else:
+                if (
+                    st.session_state.customer_whatsapp
+                    and
+                    st.session_state.complaint_text
+                ):
 
                     try:
 
@@ -1808,8 +1994,8 @@ if prompt:
                     except Exception as e:
 
                         print(
-                            "ERROR SAVE COMPLAINT:",
-                            e
+                            "ERROR SAVE NAME STEP:",
+                            repr(e)
                         )
 
 
@@ -1820,14 +2006,41 @@ if prompt:
                         )
 
 
+                elif not st.session_state.customer_whatsapp:
+
+                    st.session_state.complaint_step = (
+                        "whatsapp"
+                    )
+
+
+                    answer = (
+                        f"Terima kasih, kak "
+                        f"{st.session_state.customer_name}. 😊\n\n"
+                        "Boleh saya minta nomor WhatsApp kakak "
+                        "yang bisa dihubungi Admin untuk "
+                        "menindaklanjuti komplain ini?"
+                    )
+
+
+                else:
+
+                    st.session_state.complaint_step = (
+                        "complaint"
+                    )
+
+
+                    answer = (
+                        "Terima kasih, kak. 🙏\n\n"
+                        "Sekarang boleh ceritakan secara detail "
+                        "kendala atau komplain yang kakak alami?"
+                    )
+
+
         # =================================================
         # STEP WHATSAPP
         # =================================================
 
-        elif (
-            st.session_state.complaint_step
-            == "whatsapp"
-        ):
+        elif st.session_state.complaint_step == "whatsapp":
 
             phone = extract_phone_number(
                 prompt
@@ -1839,6 +2052,7 @@ if prompt:
                 answer = (
                     "Maaf kak, saya belum bisa mengenali "
                     "nomor WhatsAppnya. 🙏\n\n"
+
                     "Boleh kirim nomor WhatsApp kakak, "
                     "contohnya 081234567890?"
                 )
@@ -1850,10 +2064,6 @@ if prompt:
                     phone
                 )
 
-
-                # --------------------------------------------
-                # Kalau complaint sudah disimpan sementara
-                # --------------------------------------------
 
                 if st.session_state.complaint_text:
 
@@ -1879,8 +2089,8 @@ if prompt:
                     except Exception as e:
 
                         print(
-                            "ERROR SAVE COMPLAINT:",
-                            e
+                            "ERROR SAVE WHATSAPP STEP:",
+                            repr(e)
                         )
 
 
@@ -1909,17 +2119,14 @@ if prompt:
         # STEP COMPLAINT
         # =================================================
 
-        elif (
-            st.session_state.complaint_step
-            == "complaint"
-        ):
+        elif st.session_state.complaint_step == "complaint":
 
-            st.session_state.complaint_text = (
-                clean_complaint_text(prompt)
+            complaint = clean_complaint_text(
+                prompt
             )
 
 
-            if not st.session_state.complaint_text:
+            if not complaint:
 
                 answer = (
                     "Boleh ceritakan sedikit lebih detail "
@@ -1928,6 +2135,11 @@ if prompt:
 
 
             else:
+
+                st.session_state.complaint_text = (
+                    complaint
+                )
+
 
                 try:
 
@@ -1939,10 +2151,13 @@ if prompt:
 
                     answer = (
                         "Baik kak, terima kasih informasinya. 🙏\n\n"
+
                         "Komplain kakak sudah berhasil saya catat "
                         f"dengan nomor laporan **#{complaint_id}**.\n\n"
+
                         "Komplain akan disampaikan kepada Admin "
                         "Kays Kitchen untuk ditindaklanjuti.\n\n"
+
                         "Admin akan menghubungi kakak melalui "
                         "WhatsApp yang sudah diberikan."
                     )
@@ -1951,8 +2166,8 @@ if prompt:
                 except Exception as e:
 
                     print(
-                        "ERROR SAVE COMPLAINT:",
-                        e
+                        "ERROR SAVE COMPLAINT STEP:",
+                        repr(e)
                     )
 
 
@@ -1967,229 +2182,30 @@ if prompt:
     # START NEW COMPLAINT
     # =====================================================
 
-    elif is_complaint_message(prompt):
+    # =====================================================
+
+    # START NEW COMPLAINT
+
+    # =====================================================
+
+    elif (
+
+            has_complete_complaint_data(prompt)
+
+            or
+
+            is_complaint_message(prompt)
+
+    ):
 
         # -------------------------------------------------
-        # Jika customer sudah dikenal
+        # PENTING:
+        # Selalu proses pesan lengkap terlebih dahulu.
         # -------------------------------------------------
 
-        if (
-            st.session_state.customer_name
-            and
-            st.session_state.customer_whatsapp
-        ):
-
-            # ---------------------------------------------
-            # Simpan komplain langsung
-            # ---------------------------------------------
-
-            st.session_state.complaint_text = (
-                clean_complaint_text(prompt)
-            )
-
-
-            if st.session_state.complaint_text:
-
-                try:
-
-                    complaint_id = save_current_complaint()
-
-
-                    answer = (
-                        f"Baik kak "
-                        f"{st.session_state.customer_name}, "
-                        "saya bantu catat komplainnya. 🙏\n\n"
-                        "Komplain kakak sudah berhasil saya catat "
-                        f"dengan nomor laporan **#{complaint_id}**.\n\n"
-                        "Komplain akan disampaikan kepada Admin "
-                        "Kays Kitchen untuk ditindaklanjuti.\n\n"
-                        "Admin akan menghubungi kakak melalui "
-                        "WhatsApp yang sudah diberikan."
-                    )
-
-
-                    reset_complaint_process()
-
-
-                except Exception as e:
-
-                    print(
-                        "ERROR SAVE KNOWN CUSTOMER:",
-                        e
-                    )
-
-
-                    answer = (
-                        "Maaf kak, komplain belum berhasil "
-                        "disimpan. 😔"
-                    )
-
-
-            else:
-
-                st.session_state.complaint_active = True
-
-                st.session_state.complaint_step = (
-                    "complaint"
-                )
-
-
-                answer = (
-                    "Baik kak, saya bantu catat komplainnya. 🙏\n\n"
-                    "Boleh ceritakan detail kendalanya?"
-                )
-
-
-        # -------------------------------------------------
-        # Customer belum dikenal
-        # -------------------------------------------------
-
-        else:
-
-            st.session_state.complaint_active = True
-
-            st.session_state.complaint_step = "name"
-
-
-            # ---------------------------------------------
-            # Simpan complaint yang sudah diberikan
-            # ---------------------------------------------
-
-            complaint = clean_complaint_text(
-                prompt
-            )
-
-
-            if complaint:
-
-                st.session_state.complaint_text = (
-                    complaint
-                )
-
-
-            # ---------------------------------------------
-            # Coba ambil nama + WA jika langsung diberikan
-            # ---------------------------------------------
-
-            detected_name = extract_customer_name(
-                prompt
-            )
-
-
-            detected_phone = extract_phone_number(
-                prompt
-            )
-
-
-            if detected_name:
-
-                st.session_state.customer_name = (
-                    detected_name
-                )
-
-
-            if detected_phone:
-
-                st.session_state.customer_whatsapp = (
-                    detected_phone
-                )
-
-
-            # ---------------------------------------------
-            # Semua lengkap
-            # ---------------------------------------------
-
-            if (
-                st.session_state.customer_name
-                and
-                st.session_state.customer_whatsapp
-                and
-                st.session_state.complaint_text
-            ):
-
-                try:
-
-                    complaint_id = save_current_complaint()
-
-
-                    reset_complaint_process()
-
-
-                    answer = (
-                        "Baik kak, terima kasih informasinya. 🙏\n\n"
-                        "Komplain kakak sudah berhasil saya catat "
-                        f"dengan nomor laporan **#{complaint_id}**.\n\n"
-                        "Komplain akan disampaikan kepada Admin "
-                        "Kays Kitchen untuk ditindaklanjuti.\n\n"
-                        "Admin akan menghubungi kakak melalui "
-                        "WhatsApp yang sudah diberikan."
-                    )
-
-
-                except Exception as e:
-
-                    print(
-                        "ERROR SAVE COMPLETE:",
-                        e
-                    )
-
-
-                    answer = (
-                        "Maaf kak, komplain belum berhasil "
-                        "disimpan. 😔"
-                    )
-
-
-            # ---------------------------------------------
-            # Nama sudah ada
-            # ---------------------------------------------
-
-            elif st.session_state.customer_name:
-
-                if st.session_state.customer_whatsapp:
-
-                    st.session_state.complaint_step = (
-                        "complaint"
-                    )
-
-
-                    answer = (
-                        f"Baik kak "
-                        f"{st.session_state.customer_name}. 🙏\n\n"
-                        "Boleh ceritakan detail kendalanya?"
-                    )
-
-
-                else:
-
-                    st.session_state.complaint_step = (
-                        "whatsapp"
-                    )
-
-
-                    answer = (
-                        f"Baik kak "
-                        f"{st.session_state.customer_name}. 😊\n\n"
-                        "Boleh saya minta nomor WhatsApp kakak "
-                        "yang bisa dihubungi Admin?"
-                    )
-
-
-            # ---------------------------------------------
-            # Nama belum ada
-            # ---------------------------------------------
-
-            else:
-
-                st.session_state.complaint_step = "name"
-
-
-                answer = (
-                    "Mohon maaf ya kak atas kendalanya 🙏\n\n"
-                    "Saya bantu catat komplainnya agar dapat "
-                    "ditindaklanjuti oleh Admin Kays Kitchen.\n\n"
-                    "Boleh saya tahu nama kakak?"
-                )
+        answer = process_complete_complaint(
+            prompt
+        )
 
 
     # =====================================================
@@ -2232,7 +2248,7 @@ if prompt:
 
             print(
                 "ERROR OPENAI:",
-                e
+                repr(e)
             )
 
 
