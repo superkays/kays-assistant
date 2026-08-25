@@ -1082,6 +1082,8 @@ def extract_customer_name(text):
         "nasi",
         "ayam",
         "sedikit"
+        "tumpe"
+        "tumpeh"
     }
 
 
@@ -1134,12 +1136,36 @@ def extract_customer_name(text):
 
             continue
 
+        # -----------------------------------------------------
+        # CEGAH KATA KOMPLAIN YANG DIPANJANGKAN
+        # Contoh:
+        # tumpahhhhh → tetap dianggap "tumpah"
+        # kurangg    → tetap dianggap "kurang"
+        # rusakkkk   → tetap dianggap "rusak"
+        # -----------------------------------------------------
 
-        if any(
-            word.lower() in forbidden_words
-            for word in words
-        ):
+        is_forbidden = False
 
+        for word in words:
+
+            word_clean = word.lower().strip(
+                ".,!?;:()[]{}"
+            )
+
+            for forbidden in forbidden_words:
+
+                if (
+                        word_clean == forbidden
+                        or
+                        word_clean.startswith(forbidden)
+                ):
+                    is_forbidden = True
+                    break
+
+            if is_forbidden:
+                break
+
+        if is_forbidden:
             continue
 
 
@@ -1263,6 +1289,85 @@ def looks_like_name(text):
 
     return True
 
+# =========================================================
+# INTENT DETECTION
+# =========================================================
+
+def detect_intent(text):
+
+    if not text:
+        return "general"
+
+    text_lower = text.lower().strip()
+
+    # -----------------------------------------------------
+    # COMPLAINT
+    # -----------------------------------------------------
+
+    if is_complaint_message(text_lower):
+
+        return "complaint"
+
+
+    # -----------------------------------------------------
+    # MENU / HARGA
+    # -----------------------------------------------------
+
+    menu_keywords = [
+        "menu",
+        "ricebowl",
+        "ayam",
+        "sambal",
+        "matah",
+        "bawang",
+        "harga",
+        "berapa",
+        "harga berapa"
+    ]
+
+    if any(
+        keyword in text_lower
+        for keyword in menu_keywords
+    ):
+
+        return "faq"
+
+
+    # -----------------------------------------------------
+    # OPERASIONAL
+    # -----------------------------------------------------
+
+    operational_keywords = [
+        "buka",
+        "tutup",
+        "jam buka",
+        "jam berapa",
+        "lokasi",
+        "alamat",
+        "dimana",
+        "delivery",
+        "antar",
+        "kirim",
+        "bandar lampung",
+        "qris",
+        "transfer",
+        "pembayaran",
+        "bayar"
+    ]
+
+    if any(
+        keyword in text_lower
+        for keyword in operational_keywords
+    ):
+
+        return "faq"
+
+
+    # -----------------------------------------------------
+    # DEFAULT
+    # -----------------------------------------------------
+
+    return "general"
 
 # =========================================================
 # COMPLAINT DETECTION
