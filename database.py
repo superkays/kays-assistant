@@ -103,7 +103,7 @@ supabase: Client = create_client(
 
 
 # =========================================================
-# ADMIN CLIENT
+# ADMIN / SERVER CLIENT
 # =========================================================
 
 admin_supabase = None
@@ -115,6 +115,23 @@ if SUPABASE_SERVICE_ROLE_KEY:
         SUPABASE_URL,
         SUPABASE_SERVICE_ROLE_KEY
     )
+
+
+# =========================================================
+# CHECK ADMIN CLIENT
+# =========================================================
+
+def require_admin_client():
+
+    if admin_supabase is None:
+
+        raise RuntimeError(
+            "SUPABASE_SERVICE_ROLE_KEY belum dikonfigurasi. "
+            "Pastikan key tersedia di Streamlit Secrets "
+            "atau environment variable."
+        )
+
+    return admin_supabase
 
 
 # =========================================================
@@ -340,10 +357,17 @@ def save_complaint(
     status="Pending"
 ):
 
+    # -----------------------------------------------------
+    # COMPLAINT DISIMPAN DARI SERVER MIKA
+    # -----------------------------------------------------
+
+    db = require_admin_client()
+
+
     try:
 
         response = (
-            supabase
+            db
             .table("complaints")
             .insert({
 
@@ -417,7 +441,7 @@ def save_complaint(
         )
 
         print(
-            "ERROR SUPABASE INSERT"
+            "ERROR SUPABASE INSERT COMPLAINT"
         )
 
         print(
@@ -544,13 +568,20 @@ def save_order(
 
 
     # -----------------------------------------------------
+    # ADMIN / SERVER CLIENT
+    # -----------------------------------------------------
+
+    db = require_admin_client()
+
+
+    # -----------------------------------------------------
     # INSERT SUPABASE
     # -----------------------------------------------------
 
     try:
 
         response = (
-            supabase
+            db
             .table("orders")
             .insert({
 
@@ -690,18 +721,13 @@ def save_order(
 
 def get_complaints():
 
-    if admin_supabase is None:
-
-        raise RuntimeError(
-            "SUPABASE_SERVICE_ROLE_KEY "
-            "belum dikonfigurasi."
-        )
+    db = require_admin_client()
 
 
     try:
 
         response = (
-            admin_supabase
+            db
             .table("complaints")
             .select(
                 "id, created_at, customer_name, "
@@ -773,22 +799,13 @@ def get_complaints():
 
 def get_orders():
 
-    # -----------------------------------------------------
-    # HANYA ADMIN CLIENT
-    # -----------------------------------------------------
-
-    if admin_supabase is None:
-
-        raise RuntimeError(
-            "SUPABASE_SERVICE_ROLE_KEY "
-            "belum dikonfigurasi."
-        )
+    db = require_admin_client()
 
 
     try:
 
         response = (
-            admin_supabase
+            db
             .table("orders")
             .select(
                 "id, created_at, customer_name, "
@@ -887,21 +904,8 @@ def update_order_status(
     new_status
 ):
 
-    # -----------------------------------------------------
-    # HANYA ADMIN CLIENT
-    # -----------------------------------------------------
+    db = require_admin_client()
 
-    if admin_supabase is None:
-
-        raise RuntimeError(
-            "SUPABASE_SERVICE_ROLE_KEY "
-            "belum dikonfigurasi."
-        )
-
-
-    # -----------------------------------------------------
-    # STATUS YANG DIPERBOLEHKAN
-    # -----------------------------------------------------
 
     allowed_statuses = {
 
@@ -926,7 +930,7 @@ def update_order_status(
     try:
 
         response = (
-            admin_supabase
+            db
             .table("orders")
             .update({
 
@@ -981,18 +985,13 @@ def update_complaint_status(
     new_status
 ):
 
-    if admin_supabase is None:
-
-        raise RuntimeError(
-            "SUPABASE_SERVICE_ROLE_KEY "
-            "belum dikonfigurasi."
-        )
+    db = require_admin_client()
 
 
     try:
 
         response = (
-            admin_supabase
+            db
             .table("complaints")
             .update({
 
@@ -1049,6 +1048,7 @@ def test_public_insert():
     print("TEST PUBLIC INSERT")
     print("====================================")
 
+
     try:
 
         response = (
@@ -1072,14 +1072,17 @@ def test_public_insert():
             .execute()
         )
 
+
         print(
             "PUBLIC INSERT BERHASIL"
         )
+
 
         print(
             "DATA:",
             response.data
         )
+
 
         return True
 
@@ -1090,15 +1093,18 @@ def test_public_insert():
             "PUBLIC INSERT GAGAL"
         )
 
+
         print(
             "TYPE:",
             type(e).__name__
         )
 
+
         print(
             "DETAIL:",
             str(e)
         )
+
 
         return False
 
@@ -1110,6 +1116,7 @@ def test_public_insert():
 def test_public_insert_postgrest():
 
     import requests
+
 
     print("")
     print("====================================")
@@ -1221,9 +1228,11 @@ def test_secret_insert():
             "SECRET INSERT GAGAL"
         )
 
+
         print(
             "SUPABASE_SERVICE_ROLE_KEY tidak tersedia."
         )
+
 
         return False
 
@@ -1301,10 +1310,10 @@ def test_key_identity():
 
 
     print(
-        "SUPABASE KEY PREFIX:",
-        SUPABASE_KEY[:20]
+        "SUPABASE KEY TERSEDIA:",
+        "YES"
         if SUPABASE_KEY
-        else "NONE"
+        else "NO"
     )
 
 
@@ -1317,10 +1326,10 @@ def test_key_identity():
 
 
     print(
-        "SERVICE KEY PREFIX:",
-        SUPABASE_SERVICE_ROLE_KEY[:20]
+        "SERVICE KEY TERSEDIA:",
+        "YES"
         if SUPABASE_SERVICE_ROLE_KEY
-        else "NONE"
+        else "NO"
     )
 
 
@@ -1350,6 +1359,7 @@ def test_key_identity():
 def test_legacy_anon_insert():
 
     import requests
+
 
     print("")
     print("====================================")
@@ -1476,17 +1486,26 @@ if __name__ == "__main__":
         "===================================="
     )
 
+
     print(
         "DATABASE MODULE READY"
     )
+
 
     print(
         "Complaint system : ACTIVE"
     )
 
+
     print(
         "Order system     : ACTIVE"
     )
+
+
+    print(
+        "Server database  : SERVICE ROLE"
+    )
+
 
     print(
         "===================================="

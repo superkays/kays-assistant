@@ -1,4 +1,5 @@
 import streamlit as st
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from html import escape
@@ -6,7 +7,9 @@ from html import escape
 from database import (
     create_database,
     get_complaints,
-    update_complaint_status
+    update_complaint_status,
+    get_orders,
+    update_order_status
 )
 
 
@@ -128,55 +131,99 @@ if not st.session_state.admin_authenticated:
 
     .login-card {
 
-    max-width: 420px;
+        max-width: 420px;
 
-    margin: 20px auto 30px auto;
+        margin: 20px auto 30px auto;
 
-    padding: 35px 25px;
+        padding: 35px 25px;
 
-    background:
-        rgba(255, 255, 255, 0.08);
+        background:
+            rgba(255, 255, 255, 0.08);
 
-    border:
-        1px solid
-        rgba(255, 255, 255, 0.12);
+        border:
+            1px solid
+            rgba(255, 255, 255, 0.12);
 
-    border-radius: 24px;
+        border-radius: 24px;
 
-    text-align: center;
+        text-align: center;
 
-}
+    }
 
 
     .login-logo {
 
-    font-size: 55px;
+        font-size: 55px;
 
-    margin-bottom: 10px;
+        margin-bottom: 10px;
 
-}
+    }
 
 
     .login-title {
 
-    font-size: 30px;
+        font-size: 30px;
 
-    font-weight: 800;
+        font-weight: 800;
 
-    color: white;
+        color: white;
 
-}
+    }
 
 
     .login-subtitle {
 
-    font-size: 14px;
+        font-size: 14px;
 
-    color: #94a3b8;
+        color: #94a3b8;
 
-    margin-top: 6px;
+        margin-top: 6px;
 
-}
+    }
+
+
+    @media (max-width: 700px) {
+
+        .block-container {
+
+            padding-left: 14px;
+            padding-right: 14px;
+
+            padding-top: 4rem;
+
+        }
+
+        .login-card {
+
+            max-width: 100%;
+
+            margin: 10px auto 25px auto;
+
+            padding: 25px 18px;
+
+            border-radius: 20px;
+
+        }
+
+        .login-logo {
+
+            font-size: 42px;
+
+        }
+
+        .login-title {
+
+            font-size: 26px;
+
+        }
+
+        .login-subtitle {
+
+            font-size: 13px;
+
+        }
+
+    }
 
     </style>
     """)
@@ -233,7 +280,6 @@ if not st.session_state.admin_authenticated:
                 "ADMIN_PASSWORD belum dikonfigurasi "
                 "di Streamlit Secrets."
             )
-
 
         elif password_input == ADMIN_PASSWORD:
 
@@ -342,7 +388,7 @@ footer {
 
 
 /* =====================================================
-   STAT CARD
+   STAT GRID
    ===================================================== */
 
 .stat-grid {
@@ -350,7 +396,7 @@ footer {
     display: grid;
 
     grid-template-columns:
-        repeat(3, 1fr);
+        repeat(4, 1fr);
 
     gap: 15px;
 
@@ -393,6 +439,107 @@ footer {
     font-size: 28px;
 
     font-weight: 800;
+
+}
+
+
+/* =====================================================
+   ORDER CARD
+   ===================================================== */
+
+.order-card {
+
+    padding: 20px;
+
+    margin-bottom: 12px;
+
+    background:
+        rgba(255, 255, 255, 0.06);
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+
+    border-radius: 18px;
+
+}
+
+
+.order-id {
+
+    color: #38bdf8;
+
+    font-weight: 800;
+
+    font-size: 14px;
+
+    margin-bottom: 5px;
+
+}
+
+
+.order-name {
+
+    color: white;
+
+    font-size: 20px;
+
+    font-weight: 800;
+
+    margin-bottom: 5px;
+
+}
+
+
+.order-info {
+
+    color: #cbd5e1;
+
+    font-size: 13px;
+
+    margin-bottom: 15px;
+
+}
+
+
+.order-items {
+
+    color: white;
+
+    font-size: 15px;
+
+    line-height: 1.8;
+
+}
+
+
+.order-total {
+
+    color: #facc15;
+
+    font-size: 18px;
+
+    font-weight: 800;
+
+    margin-top: 12px;
+
+}
+
+
+.order-notes {
+
+    color: #cbd5e1;
+
+    font-size: 14px;
+
+    margin-top: 12px;
+
+    padding: 12px;
+
+    background:
+        rgba(0, 0, 0, 0.18);
+
+    border-radius: 12px;
 
 }
 
@@ -462,7 +609,7 @@ footer {
 
 
 /* =====================================================
-   LOGOUT BUTTON
+   LOGOUT
    ===================================================== */
 
 .logout-area {
@@ -479,38 +626,6 @@ footer {
    ===================================================== */
 
 @media (max-width: 700px) {
-
-    .login-card {
-
-        max-width: 100%;
-
-        margin: 10px auto 25px auto;
-
-        padding: 25px 18px;
-
-        border-radius: 20px;
-
-    }
-
-    .login-logo {
-
-        font-size: 42px;
-
-    }
-
-    .login-title {
-
-        font-size: 26px;
-
-    }
-
-    .login-subtitle {
-
-        font-size: 13px;
-
-    }
-
-}
 
     .block-container {
 
@@ -532,7 +647,30 @@ footer {
     .stat-grid {
 
         grid-template-columns:
-            1fr;
+            repeat(2, 1fr);
+
+        gap: 10px;
+
+    }
+
+
+    .stat-card {
+
+        padding: 15px;
+
+    }
+
+
+    .stat-value {
+
+        font-size: 24px;
+
+    }
+
+
+    .order-card {
+
+        padding: 16px;
 
     }
 
@@ -545,10 +683,92 @@ footer {
 
 }
 
-
-
 </style>
 """)
+
+
+# =========================================================
+# HELPER - FORMAT RUPIAH
+# =========================================================
+
+def format_rupiah(value):
+
+    try:
+
+        value = int(value or 0)
+
+    except Exception:
+
+        return "Rp0"
+
+
+    return (
+        "Rp"
+        +
+        f"{value:,}"
+        .replace(",", ".")
+    )
+
+
+# =========================================================
+# HELPER - FORMAT GMT+7
+# =========================================================
+
+def format_datetime_gmt7(created_at):
+
+    if not created_at:
+
+        return "-"
+
+
+    try:
+
+        created_at_string = str(
+            created_at
+        )
+
+
+        # Supabase biasanya:
+        # 2026-08-25T09:00:00+00:00
+
+        dt = datetime.fromisoformat(
+
+            created_at_string.replace(
+                "Z",
+                "+00:00"
+            )
+
+        )
+
+
+        # Jika belum memiliki timezone
+
+        if dt.tzinfo is None:
+
+            dt = dt.replace(
+                tzinfo=ZoneInfo("UTC")
+            )
+
+
+        dt_jakarta = dt.astimezone(
+
+            ZoneInfo(
+                "Asia/Jakarta"
+            )
+
+        )
+
+
+        return dt_jakarta.strftime(
+            "%d/%m/%Y %H:%M"
+        )
+
+
+    except Exception:
+
+        return str(
+            created_at
+        )
 
 
 # =========================================================
@@ -563,7 +783,7 @@ st.html("""
     </div>
 
     <div class="admin-subtitle">
-        Complaint Center — Admin Dashboard
+        Admin Dashboard — Order & Complaint Center
     </div>
 
 </div>
@@ -582,9 +802,10 @@ logout_col1, logout_col2 = st.columns(
 with logout_col2:
 
     if st.button(
-            "🚪 Logout",
-            use_container_width=True
+        "🚪 Logout",
+        use_container_width=True
     ):
+
         st.session_state.admin_authenticated = False
 
         st.session_state.pop(
@@ -596,7 +817,7 @@ with logout_col2:
 
 
 # =========================================================
-# LOAD COMPLAINTS
+# LOAD DATABASE
 # =========================================================
 
 try:
@@ -610,15 +831,33 @@ except Exception as e:
     )
 
     print(
-        "ADMIN DATABASE ERROR:",
+        "ADMIN COMPLAINT DATABASE ERROR:",
         e
     )
 
-    st.stop()
+    complaints = []
+
+
+try:
+
+    orders = get_orders()
+
+except Exception as e:
+
+    st.error(
+        "❌ Gagal mengambil data order dari database."
+    )
+
+    print(
+        "ADMIN ORDER DATABASE ERROR:",
+        e
+    )
+
+    orders = []
 
 
 # =========================================================
-# CALCULATE STATISTICS
+# COMPLAINT STATISTICS
 # =========================================================
 
 total_complaints = len(
@@ -626,7 +865,7 @@ total_complaints = len(
 )
 
 
-pending_count = sum(
+pending_complaints = sum(
 
     1
 
@@ -637,7 +876,7 @@ pending_count = sum(
 )
 
 
-process_count = sum(
+process_complaints = sum(
 
     1
 
@@ -648,7 +887,7 @@ process_count = sum(
 )
 
 
-done_count = sum(
+done_complaints = sum(
 
     1
 
@@ -660,7 +899,49 @@ done_count = sum(
 
 
 # =========================================================
-# STATISTICS
+# ORDER STATISTICS
+# =========================================================
+
+total_orders = len(
+    orders
+)
+
+
+pending_orders = sum(
+
+    1
+
+    for order in orders
+
+    if order.get("status") == "Pending"
+
+)
+
+
+process_orders = sum(
+
+    1
+
+    for order in orders
+
+    if order.get("status") == "Diproses"
+
+)
+
+
+done_orders = sum(
+
+    1
+
+    for order in orders
+
+    if order.get("status") == "Selesai"
+
+)
+
+
+# =========================================================
+# DASHBOARD STATISTICS
 # =========================================================
 
 st.html(f"""
@@ -669,11 +950,11 @@ st.html(f"""
     <div class="stat-card">
 
         <div class="stat-label">
-            TOTAL COMPLAINT
+            📦 TOTAL ORDER
         </div>
 
         <div class="stat-value">
-            {total_complaints}
+            {total_orders}
         </div>
 
     </div>
@@ -682,11 +963,11 @@ st.html(f"""
     <div class="stat-card">
 
         <div class="stat-label">
-            PENDING
+            🟡 ORDER PENDING
         </div>
 
         <div class="stat-value">
-            {pending_count}
+            {pending_orders}
         </div>
 
     </div>
@@ -695,11 +976,24 @@ st.html(f"""
     <div class="stat-card">
 
         <div class="stat-label">
-            SELESAI
+            🔵 ORDER DIPROSES
         </div>
 
         <div class="stat-value">
-            {done_count}
+            {process_orders}
+        </div>
+
+    </div>
+
+
+    <div class="stat-card">
+
+        <div class="stat-label">
+            🟢 ORDER SELESAI
+        </div>
+
+        <div class="stat-value">
+            {done_orders}
         </div>
 
     </div>
@@ -712,12 +1006,12 @@ st.html(f"""
 # REFRESH
 # =========================================================
 
-col1, col2 = st.columns(
+refresh_col1, refresh_col2 = st.columns(
     [1, 5]
 )
 
 
-with col1:
+with refresh_col1:
 
     if st.button(
         "🔄 Refresh",
@@ -728,267 +1022,627 @@ with col1:
 
 
 # =========================================================
-# FILTER
+# MAIN TABS
 # =========================================================
 
-with col2:
+tab_orders, tab_complaints = st.tabs(
 
-    filter_status = st.selectbox(
+    [
+        "📦 ORDER",
+        "📋 COMPLAINT"
+    ]
 
-        "Filter status",
+)
+
+
+# =========================================================
+# =========================================================
+# ORDER CENTER
+# =========================================================
+# =========================================================
+
+with tab_orders:
+
+    st.subheader(
+        "📦 Daftar Order"
+    )
+
+
+    # -----------------------------------------------------
+    # ORDER FILTER
+    # -----------------------------------------------------
+
+    order_filter = st.selectbox(
+
+        "Filter status order",
 
         [
             "Semua",
             "Pending",
             "Diproses",
-            "Selesai"
+            "Selesai",
+            "Dibatalkan"
+        ],
+
+        key="order_filter"
+
+    )
+
+
+    # -----------------------------------------------------
+    # FILTER ORDER
+    # -----------------------------------------------------
+
+    if order_filter == "Semua":
+
+        filtered_orders = orders
+
+    else:
+
+        filtered_orders = [
+
+            order
+
+            for order in orders
+
+            if order.get("status")
+            == order_filter
+
         ]
 
-    )
+
+    # -----------------------------------------------------
+    # NO ORDER
+    # -----------------------------------------------------
+
+    if not filtered_orders:
+
+        st.info(
+            "📭 Belum ada order."
+        )
 
 
-# =========================================================
-# FILTER DATA
-# =========================================================
+    # -----------------------------------------------------
+    # DISPLAY ORDERS
+    # -----------------------------------------------------
 
-if filter_status == "Semua":
+    for order in filtered_orders:
 
-    filtered_complaints = complaints
+        order_id = order.get(
+            "id"
+        )
 
-else:
+        created_at = order.get(
+            "created_at"
+        )
 
-    filtered_complaints = [
+        customer_name = order.get(
+            "customer_name"
+        )
 
-        complaint
+        customer_whatsapp = order.get(
+            "customer_whatsapp"
+        )
 
-        for complaint in complaints
+        sambal_matah_qty = order.get(
+            "sambal_matah_qty"
+        ) or 0
 
-        if complaint[5] == filter_status
+        sambal_bawang_qty = order.get(
+            "sambal_bawang_qty"
+        ) or 0
 
-    ]
+        total_items = order.get(
+            "total_items"
+        ) or 0
 
+        total_price = order.get(
+            "total_price"
+        ) or 0
 
-# =========================================================
-# TITLE
-# =========================================================
+        notes = order.get(
+            "notes"
+        ) or ""
 
-st.subheader(
-    "📋 Daftar Complaint"
-)
-
-
-# =========================================================
-# NO DATA
-# =========================================================
-
-if not filtered_complaints:
-
-    st.info(
-        "Belum ada complaint."
-    )
-
-
-# =========================================================
-# DISPLAY COMPLAINTS
-# =========================================================
-
-for complaint in filtered_complaints:
-
-    (
-        complaint_id,
-        created_at,
-        customer_name,
-        customer_whatsapp,
-        complaint_text,
-        status
-
-    ) = complaint
+        status = order.get(
+            "status"
+        ) or "Pending"
 
 
-    # =====================================================
-    # CONVERT TIME TO GMT+7
-    # =====================================================
+        # -------------------------------------------------
+        # TIME
+        # -------------------------------------------------
 
-    try:
-
-        if created_at:
-
-            created_at_string = str(
-                created_at
-            )
-
-            # Supabase biasanya mengirim:
-            # 2026-08-23T15:26:21+00:00
-
-            dt = datetime.fromisoformat(
-                created_at_string.replace(
-                    "Z",
-                    "+00:00"
-                )
-            )
-
-
-            # Jika belum memiliki timezone
-            if dt.tzinfo is None:
-
-                dt = dt.replace(
-                    tzinfo=ZoneInfo("UTC")
-                )
-
-
-            dt_jakarta = dt.astimezone(
-                ZoneInfo("Asia/Jakarta")
-            )
-
-
-            formatted_time = dt_jakarta.strftime(
-                "%d/%m/%Y %H:%M"
-            )
-
-        else:
-
-            formatted_time = "-"
-
-
-    except Exception:
-
-        formatted_time = str(
+        formatted_time = format_datetime_gmt7(
             created_at
         )
 
 
-    # =====================================================
-    # ESCAPE DATA
-    # =====================================================
+        # -------------------------------------------------
+        # ESCAPE DATA
+        # -------------------------------------------------
 
-    safe_id = escape(
-        str(complaint_id)
+        safe_id = escape(
+            str(order_id)
+        )
+
+        safe_name = escape(
+            str(customer_name or "-")
+        )
+
+        safe_whatsapp = escape(
+            str(customer_whatsapp or "-")
+        )
+
+        safe_time = escape(
+            str(formatted_time)
+        )
+
+        safe_notes = escape(
+            str(notes)
+        )
+
+
+        # -------------------------------------------------
+        # ORDER CARD
+        # -------------------------------------------------
+
+        st.html(f"""
+        <div class="order-card">
+
+            <div class="order-id">
+                ORDER #{safe_id}
+            </div>
+
+
+            <div class="order-name">
+                👤 {safe_name}
+            </div>
+
+
+            <div class="order-info">
+                📱 {safe_whatsapp}
+                &nbsp;&nbsp;•&nbsp;&nbsp;
+                🕒 {safe_time}
+            </div>
+
+
+            <div class="order-items">
+
+                🌶️ Sambal Matah:
+                <b>{sambal_matah_qty}</b>
+
+                <br>
+
+                🧄 Sambal Bawang:
+                <b>{sambal_bawang_qty}</b>
+
+                <br>
+
+                🍚 Total:
+                <b>{total_items} ricebowl</b>
+
+            </div>
+
+
+            <div class="order-total">
+
+                💰 Total Harga:
+                {format_rupiah(total_price)}
+
+            </div>
+
+
+            <div class="order-notes">
+
+                📝 <b>Catatan</b>
+
+                <br><br>
+
+                {safe_notes if safe_notes else "Tidak ada catatan."}
+
+            </div>
+
+
+        </div>
+        """)
+
+
+        # -------------------------------------------------
+        # STATUS
+        # -------------------------------------------------
+
+        order_status_options = [
+
+            "Pending",
+
+            "Diproses",
+
+            "Selesai",
+
+            "Dibatalkan"
+
+        ]
+
+
+        if status in order_status_options:
+
+            current_order_index = (
+                order_status_options.index(
+                    status
+                )
+            )
+
+        else:
+
+            current_order_index = 0
+
+
+        new_order_status = st.selectbox(
+
+            f"Status Order #{order_id}",
+
+            order_status_options,
+
+            index=current_order_index,
+
+            key=f"order_status_{order_id}"
+
+        )
+
+
+        # -------------------------------------------------
+        # UPDATE STATUS
+        # -------------------------------------------------
+
+        if new_order_status != status:
+
+            try:
+
+                update_order_status(
+
+                    order_id,
+
+                    new_order_status
+
+                )
+
+
+                st.success(
+
+                    f"Status Order #{order_id} "
+                    f"berhasil diubah menjadi "
+                    f"{new_order_status}."
+
+                )
+
+
+                st.rerun()
+
+
+            except Exception as e:
+
+                st.error(
+
+                    f"Gagal mengubah status "
+                    f"Order #{order_id}."
+
+                )
+
+
+                print(
+                    "UPDATE ORDER STATUS ERROR:",
+                    e
+                )
+
+
+        st.divider()
+
+
+# =========================================================
+# =========================================================
+# COMPLAINT CENTER
+# =========================================================
+# =========================================================
+
+with tab_complaints:
+
+    st.subheader(
+        "📋 Daftar Complaint"
     )
 
-    safe_name = escape(
-        str(customer_name)
-    )
 
-    safe_whatsapp = escape(
-        str(customer_whatsapp)
-    )
-
-    safe_complaint = escape(
-        str(complaint_text)
-    )
-
-    safe_time = escape(
-        str(formatted_time)
-    )
-
-
-    # =====================================================
-    # COMPLAINT CARD
-    # =====================================================
+    # -----------------------------------------------------
+    # COMPLAINT STATISTICS
+    # -----------------------------------------------------
 
     st.html(f"""
-    <div class="complaint-card">
+    <div class="stat-grid">
 
-        <div class="complaint-id">
-            LAPORAN #{safe_id}
+        <div class="stat-card">
+
+            <div class="stat-label">
+                TOTAL COMPLAINT
+            </div>
+
+            <div class="stat-value">
+                {total_complaints}
+            </div>
+
         </div>
 
-        <div class="complaint-name">
-            {safe_name}
+
+        <div class="stat-card">
+
+            <div class="stat-label">
+                PENDING
+            </div>
+
+            <div class="stat-value">
+                {pending_complaints}
+            </div>
+
         </div>
 
-        <div class="complaint-info">
-            📱 {safe_whatsapp}
-            &nbsp;&nbsp;•&nbsp;&nbsp;
-            🕒 {safe_time}
+
+        <div class="stat-card">
+
+            <div class="stat-label">
+                DIPROSES
+            </div>
+
+            <div class="stat-value">
+                {process_complaints}
+            </div>
+
         </div>
 
-        <div class="complaint-text">
-            {safe_complaint}
+
+        <div class="stat-card">
+
+            <div class="stat-label">
+                SELESAI
+            </div>
+
+            <div class="stat-value">
+                {done_complaints}
+            </div>
+
         </div>
 
     </div>
     """)
 
 
-    # =====================================================
-    # STATUS UPDATE
-    # =====================================================
+    # -----------------------------------------------------
+    # FILTER
+    # -----------------------------------------------------
 
-    status_options = [
+    complaint_filter = st.selectbox(
 
-        "Pending",
+        "Filter status complaint",
 
-        "Diproses",
+        [
+            "Semua",
+            "Pending",
+            "Diproses",
+            "Selesai"
+        ],
 
-        "Selesai"
-
-    ]
-
-
-    if status in status_options:
-
-        current_index = status_options.index(
-            status
-        )
-
-    else:
-
-        current_index = 0
-
-
-    new_status = st.selectbox(
-
-        f"Status laporan #{complaint_id}",
-
-        status_options,
-
-        index=current_index,
-
-        key=f"status_{complaint_id}"
+        key="complaint_filter"
 
     )
 
 
-    if new_status != status:
+    # -----------------------------------------------------
+    # FILTER DATA
+    # -----------------------------------------------------
 
-        try:
+    if complaint_filter == "Semua":
 
-            update_complaint_status(
+        filtered_complaints = complaints
 
-                complaint_id,
+    else:
 
-                new_status
+        filtered_complaints = [
 
+            complaint
+
+            for complaint in complaints
+
+            if complaint[5]
+            == complaint_filter
+
+        ]
+
+
+    # -----------------------------------------------------
+    # NO DATA
+    # -----------------------------------------------------
+
+    if not filtered_complaints:
+
+        st.info(
+            "📭 Belum ada complaint."
+        )
+
+
+    # -----------------------------------------------------
+    # DISPLAY COMPLAINTS
+    # -----------------------------------------------------
+
+    for complaint in filtered_complaints:
+
+        (
+            complaint_id,
+            created_at,
+            customer_name,
+            customer_whatsapp,
+            complaint_text,
+            status
+
+        ) = complaint
+
+
+        # -------------------------------------------------
+        # TIME GMT+7
+        # -------------------------------------------------
+
+        formatted_time = format_datetime_gmt7(
+            created_at
+        )
+
+
+        # -------------------------------------------------
+        # ESCAPE
+        # -------------------------------------------------
+
+        safe_id = escape(
+            str(complaint_id)
+        )
+
+        safe_name = escape(
+            str(customer_name or "-")
+        )
+
+        safe_whatsapp = escape(
+            str(customer_whatsapp or "-")
+        )
+
+        safe_complaint = escape(
+            str(complaint_text or "-")
+        )
+
+        safe_time = escape(
+            str(formatted_time)
+        )
+
+
+        # -------------------------------------------------
+        # COMPLAINT CARD
+        # -------------------------------------------------
+
+        st.html(f"""
+        <div class="complaint-card">
+
+            <div class="complaint-id">
+                LAPORAN #{safe_id}
+            </div>
+
+
+            <div class="complaint-name">
+                {safe_name}
+            </div>
+
+
+            <div class="complaint-info">
+
+                📱 {safe_whatsapp}
+
+                &nbsp;&nbsp;•&nbsp;&nbsp;
+
+                🕒 {safe_time}
+
+            </div>
+
+
+            <div class="complaint-text">
+
+                {safe_complaint}
+
+            </div>
+
+        </div>
+        """)
+
+
+        # -------------------------------------------------
+        # STATUS
+        # -------------------------------------------------
+
+        complaint_status_options = [
+
+            "Pending",
+
+            "Diproses",
+
+            "Selesai"
+
+        ]
+
+
+        if status in complaint_status_options:
+
+            current_complaint_index = (
+                complaint_status_options.index(
+                    status
+                )
             )
 
-            st.success(
+        else:
 
-                f"Status laporan #{complaint_id} "
-                f"berhasil diubah menjadi "
-                f"{new_status}."
-
-            )
-
-            st.rerun()
+            current_complaint_index = 0
 
 
-        except Exception as e:
+        new_complaint_status = st.selectbox(
 
-            st.error(
+            f"Status laporan #{complaint_id}",
 
-                f"Gagal mengubah status "
-                f"laporan #{complaint_id}."
+            complaint_status_options,
 
-            )
+            index=current_complaint_index,
 
-            print(
-                "UPDATE STATUS ERROR:",
-                e
-            )
+            key=f"complaint_status_{complaint_id}"
+
+        )
 
 
-    st.divider()
+        # -------------------------------------------------
+        # UPDATE STATUS
+        # -------------------------------------------------
+
+        if new_complaint_status != status:
+
+            try:
+
+                update_complaint_status(
+
+                    complaint_id,
+
+                    new_complaint_status
+
+                )
+
+
+                st.success(
+
+                    f"Status laporan #{complaint_id} "
+                    f"berhasil diubah menjadi "
+                    f"{new_complaint_status}."
+
+                )
+
+
+                st.rerun()
+
+
+            except Exception as e:
+
+                st.error(
+
+                    f"Gagal mengubah status "
+                    f"laporan #{complaint_id}."
+
+                )
+
+
+                print(
+                    "UPDATE COMPLAINT STATUS ERROR:",
+                    e
+                )
+
+
+        st.divider()
 
 
 # =========================================================
