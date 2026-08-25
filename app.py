@@ -763,13 +763,13 @@ st.html("""
     <div class="kays-brand">
 
         <div class="kays-logo">
-            🍗
+            🎧
         </div>
 
         <div>
 
             <div class="kays-title">
-                CS Mika
+                Mika
             </div>
 
             <div class="kays-subtitle">
